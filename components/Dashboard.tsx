@@ -12,6 +12,7 @@ import {
 import WelcomeModal from './WelcomeModal';
 
 // Helper Component for Stats Card
+import { UpdateBanner } from './UpdateBanner';
 const StatCard = ({ title, amount, type }: { title: string, amount: number, type: 'income' | 'expense' | 'net' }) => {
     let colorClass = '';
     if (type === 'income') colorClass = 'text-emerald-600 dark:text-emerald-400';
@@ -173,6 +174,9 @@ const Dashboard: React.FC = () => {
     return (
         <div className="space-y-6 animate-in fade-in pb-20 max-w-7xl mx-auto">
             <WelcomeModal isOpen={showWelcome} onClose={() => setShowWelcome(false)} userName={user?.full_name || 'يا بطل'} />
+
+            {/* Auto Update Banner */}
+            <UpdateBanner />
 
             {/* Header & Subscription Status */}
             <div className="flex flex-col md:flex-row justify-between items-end gap-4 mb-6">
