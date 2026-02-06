@@ -301,8 +301,8 @@ const Layout: React.FC = () => {
         </nav>
 
         <div className="p-4 border-t border-gray-100 dark:border-slate-800">
-          {/* Super Admin Link - Always visible for super_admin, or for owners without org */}
-          {(userProfile?.role === 'super_admin' || (!userProfile?.org_id && (userProfile?.role === 'owner' || userProfile?.role === 'admin'))) && (
+          {/* Super Admin Link - Visible for Super Admin and Owners */}
+          {(userProfile?.role === 'super_admin' || userProfile?.role === 'owner') && (
             <Link to="/admin" className="flex items-center gap-2 text-purple-500 hover:text-purple-400 mb-4 px-2 text-xs font-bold bg-purple-500/10 p-2 rounded-lg">
               <Crown className="w-3 h-3" /> لوحة الإدارة العليا
             </Link>
