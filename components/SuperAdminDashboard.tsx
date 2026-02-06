@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import AnalyticsDashboard from './AnalyticsDashboard';
 
-console.log("🚀 Admin Dashboard v3 - Update 'amin' - Loaded Successfully! (Check 2026-02-06 22:05)");
+console.log("🚀 Admin Dashboard v4 - Auto-Update Test - Loaded Successfully! (Check 2026-02-06 23:25)");
 
 import { Profile, Organization, SystemConfig, Plan, AuditLog, UserPermissions, PlanFeatures, DiscountCode, PaymentRequest } from '../types';
 import { supabase } from '../lib/supabaseClient';
