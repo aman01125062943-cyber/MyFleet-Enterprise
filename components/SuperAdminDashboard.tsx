@@ -2,8 +2,9 @@
 // Force Update Trigger v1
 import React, { useState, useEffect } from 'react';
 import AnalyticsDashboard from './AnalyticsDashboard';
+import { UpdateBanner } from './UpdateBanner';
 
-console.log("🚀 Admin Dashboard v5 - New UI Banner Test - Loaded Successfully! (Check 2026-02-06 23:45)");
+console.log("🚀 Admin Dashboard v6 - Final Banner Check - Loaded Successfully! (Check 2026-02-06 23:55)");
 
 import { Profile, Organization, SystemConfig, Plan, AuditLog, UserPermissions, PlanFeatures, DiscountCode, PaymentRequest } from '../types';
 import { supabase } from '../lib/supabaseClient';
