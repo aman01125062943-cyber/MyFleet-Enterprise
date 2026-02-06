@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import AnalyticsDashboard from './AnalyticsDashboard';
 
-console.log("🚀 Admin Dashboard v4 - Auto-Update Test - Loaded Successfully! (Check 2026-02-06 23:25)");
+console.log("🚀 Admin Dashboard v5 - New UI Banner Test - Loaded Successfully! (Check 2026-02-06 23:45)");
 
 import { Profile, Organization, SystemConfig, Plan, AuditLog, UserPermissions, PlanFeatures, DiscountCode, PaymentRequest } from '../types';
 import { supabase } from '../lib/supabaseClient';
@@ -353,6 +353,9 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({ stats, loading }) => 
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
+            {/* Update Notification Banner */}
+            <UpdateBanner />
+
             {/* Main Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {mainStats.map((stat) => (
