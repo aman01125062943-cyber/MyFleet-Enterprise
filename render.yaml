@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: myfleet-pro
+    env: docker
+    region: frankfurt
+    plan: free
+    branch: main
+    envVars:
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false

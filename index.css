@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@200;300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@source "./";
+@source "./components";
+
+/* Enable class-based dark mode */
+@variant dark (&:where(.dark, .dark *));
+
+/* Force Dark Mode via Class Strategy for Tailwind v4 */
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-cairo: "Cairo", sans-serif;
+
+  /* Semantic Colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+:root {
+  --background: #f8fafc; /* Slate-50 */
+  --foreground: #0f172a; /* Slate-900 */
+}
+
+/* Dark Mode Overrides */
+:root.dark {
+  --background: #0f172a; /* Slate-900 */
+  --foreground: #f8fafc; /* Slate-50 */
+}
+
+body {
+  font-family: "Cairo", sans-serif;
+  /* Hardware Acceleration for Smoother Scrolling */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* 🚀 Mobile Performance Optimizations */
+@media (max-width: 768px) {
+  * {
+    /* Disable heavy animations on mobile */
+    animation-duration: 0.5s !important;
+    transition-duration: 0.2s !important;
+  }
+
+  /* Disable Backdrop Blur on weak devices */
+  .backdrop-blur-md,
+  .backdrop-blur-lg,
+  .backdrop-blur-xl {
+    backdrop-filter: none !important;
+    background-color: rgba(15, 23, 42, 0.95) !important;
+    /* Fallback solid color */
+  }
+
+  /* Force Hardware Acceleration */
+  .transform-gpu {
+    transform: translateZ(0);
+    will-change: transform, opacity;
+  }
+}
