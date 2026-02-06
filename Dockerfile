@@ -29,4 +29,5 @@ COPY nginx-env.template.js /usr/share/nginx/html/nginx-env.template.js
 EXPOSE 80
 
 # Start Nginx using a shell to generate the config file at runtime
-CMD ["/bin/sh", "-c", "envsubst < /usr/share/nginx/html/nginx-env.template.js > /usr/share/nginx/html/env-config.js && nginx -g 'daemon off;'"]
+# Start Nginx using a shell to generate the config file at runtime with a unique version ID
+CMD ["/bin/sh", "-c", "export APP_VERSION=$(date +%s) && envsubst < /usr/share/nginx/html/nginx-env.template.js > /usr/share/nginx/html/env-config.js && nginx -g 'daemon off;'"]

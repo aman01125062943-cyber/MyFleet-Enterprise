@@ -95,12 +95,14 @@ const RootRedirect: React.FC = () => {
 import { ThemeProvider } from './components/ThemeProvider';
 
 const AnnouncementModal = React.lazy(() => import('./components/AnnouncementModal'));
+import { UpdateNotification } from './components/UpdateNotification';
 
 const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <ThemeProvider>
         <ToastProvider>
+          <UpdateNotification /> {/* Auto-update alert */}
           <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Suspense fallback={<PageLoader />}>
               <AnnouncementModal /> {/* Added globally */}
