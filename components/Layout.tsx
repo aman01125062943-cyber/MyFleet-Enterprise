@@ -360,6 +360,14 @@ const Layout: React.FC = () => {
                 <><WifiOff className="w-3 h-3 text-red-500" /> <span className="text-red-500">أوفلاين</span></>
               )}
             </div>
+
+            {/* Mobile Super Admin Link */}
+            {(userProfile?.role === 'super_admin' || userProfile?.role === 'owner') && (
+              <Link to="/admin" className="p-2 rounded-full bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 active:scale-95 transition shadow-sm border border-purple-200 dark:border-purple-800">
+                <Crown className="w-5 h-5" />
+              </Link>
+            )}
+
             <button onClick={toggleTheme} className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 active:scale-95 transition">
               {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
