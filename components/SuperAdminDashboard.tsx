@@ -539,8 +539,8 @@ const OrganizationsSection: React.FC<{ initialOrgs: Organization[]; onRefresh: (
                 </div>
             </div>
 
-            {/* Organizations Table */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+            {/* Organizations Table (Desktop) */}
+            <div className="hidden md:block bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-right">
                         <thead className="bg-slate-800/50 text-slate-400 text-xs font-bold uppercase">
@@ -643,6 +643,65 @@ const OrganizationsSection: React.FC<{ initialOrgs: Organization[]; onRefresh: (
                         </div>
                     )
                 }
+            </div>
+
+            {/* Organizations Cards (Mobile) */}
+            <div className="md:hidden space-y-4">
+                {filteredOrgs.map((org) => (
+                    <div key={org.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-4">
+                        <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center font-bold text-white text-lg shadow-lg shadow-blue-900/20">
+                                    {org.name?.charAt(0) || 'O'}
+                                </div>
+                                <div>
+                                    <div className="font-bold text-white">{org.name}</div>
+                                    <div className="text-xs text-slate-500 font-mono mt-0.5">{org.id.substring(0, 8)}...</div>
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-2">
+                                {getPlanBadge(org.subscription_plan)}
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${org.is_active === false
+                                    ? 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                                    : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                    } `}>
+                                    {org.is_active === false ? 'معطل' : 'نشط'}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs bg-slate-950/50 p-3 rounded-xl border border-slate-800/50">
+                            <div className="text-slate-400">تاريخ البداية:</div>
+                            <div className="text-slate-200 text-left font-mono">{org.subscription_start ? new Date(org.subscription_start).toLocaleDateString('en-CA') : '-'}</div>
+                            <div className="text-slate-400">تاريخ الانتهاء:</div>
+                            <div className={`text-left font-mono ${org.subscription_end && new Date(org.subscription_end) < new Date() ? 'text-red-400' : 'text-slate-200'}`}>
+                                {org.subscription_end ? new Date(org.subscription_end).toLocaleDateString('en-CA') : '-'}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
+                            <button onClick={() => setSelectedOrg(org)} className="flex-1 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition">
+                                <Settings className="w-3 h-3" /> إدارة
+                            </button>
+                            <button onClick={() => { setSelectedOrgTab('users'); setSelectedOrg(org); }} className="flex-1 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition">
+                                <Users className="w-3 h-3" /> المستخدمين
+                            </button>
+                            <button onClick={() => handleToggleStatus(org)} className={`w-9 h-9 flex items-center justify-center rounded-lg transition ${org.is_active === false ? 'bg-emerald-500/10 text-emerald-400' : 'bg-orange-500/10 text-orange-400'}`}>
+                                <Power className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleDelete(org)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition">
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                ))}
+
+                {filteredOrgs.length === 0 && (
+                    <div className="p-8 text-center text-slate-500 bg-slate-900 border border-slate-800 rounded-2xl">
+                        <Building className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                        <p className="text-sm">لا توجد بيانات للعرض</p>
+                    </div>
+                )}
             </div>
 
             {/* Advanced Organization Management Modal */}
