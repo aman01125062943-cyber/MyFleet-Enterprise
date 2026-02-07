@@ -222,24 +222,19 @@ const LandingPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. Pricing / CTA Section */}
+      {/* 4. Pricing Section (Dynamic) */}
       <div id="pricing" className="py-24 bg-gradient-to-b from-[#0f172a] to-[#1e293b]">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <h2 className="text-3xl md:text-5xl font-bold mb-6">جاهز لتنظيم أسطولك؟</h2>
-          <p className="text-slate-400 text-lg mb-10">
-            انضم لمئات الشركات التي تثق في MyFleet Pro لإدارة أعمالها يومياً.
-            <br />
-            ابدأ الآن بفترة تجريبية مجانية، بدون بطاقة ائتمان.
-          </p>
-          <div className="flex flex-col md:flex-row justify-center gap-6">
-            <Link to="/login" className="bg-emerald-600 hover:bg-emerald-500 text-white px-10 py-5 rounded-2xl font-bold text-xl shadow-2xl shadow-emerald-900/40 transition hover:-translate-y-1">
-              أنشئ حسابك المجاني الآن
-            </Link>
+        {loadingPlans ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p className="text-slate-400">جاري تحميل الباقات...</p>
           </div>
-          <p className="mt-6 text-sm text-slate-500">
-            * فترة تجربة مجانية لمدة 7 أيام تشمل كامل المميزات.
-          </p>
-        </div>
+        ) : (
+          <PricingSection
+            plans={plans}
+            onSelectPlan={(plan) => window.location.href = '/login'}
+          />
+        )}
       </div>
 
       {/* 5. Footer */}

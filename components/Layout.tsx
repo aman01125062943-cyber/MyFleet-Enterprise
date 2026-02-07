@@ -222,7 +222,7 @@ const Layout: React.FC = () => {
       || systemConfig.available_plans.find(p => p.id === 'trial');
 
     if (plan?.features) {
-      const features = plan.features as any;
+      const features = plan.features as Record<string, any>;
       if (features[module] === false) return false;
     }
     return true;
@@ -230,7 +230,7 @@ const Layout: React.FC = () => {
 
   const checkUserPermissions = (module: keyof UserPermissions, action?: string): boolean => {
     if (!userProfile?.permissions) return false;
-    const mod = (userProfile.permissions as any)[module];
+    const mod = (userProfile.permissions as Record<string, any>)[module];
     if (action && mod) return mod[action] === true;
     return mod?.view === true;
   };
@@ -248,18 +248,14 @@ const Layout: React.FC = () => {
   };
 
   const navItems = [
-    { label: 'الرئيسية', path: '/dashboard', icon: Home, show: true },
-    { label: 'السيارات والحركات', path: '/inventory', icon: Car, show: userProfile && can('inventory') },
-    { label: 'حاسبة الرحلات', path: '/calculator', icon: Calculator, show: true },
-    { label: 'فريق العمل', path: '/team', icon: Users, show: userProfile && can('team') },
-    { label: 'الأصول', path: '/assets', icon: Database, show: userProfile && can('assets') },
-    { label: 'ترقية الباقة', path: '/subscription', icon: Crown, show: true },
-    { label: 'الإعدادات', path: '/settings', icon: SettingsIcon, show: true },
+    { id: 'dashboard', label: 'الرئيسية', icon: Home, path: '/dashboard', show: true },
+    { id: 'inventory', label: 'السيارات والحركات', icon: Car, path: '/inventory', show: can('inventory') },
+    { id: 'calculator', label: 'حاسبة الرحلات', icon: Calculator, path: '/calculator', show: true },
+    { id: 'team', label: 'فريق العمل', icon: Users, path: '/team', show: can('team') },
+    { id: 'assets', label: 'الأصول', icon: Database, path: '/assets', show: can('assets') },
+    { id: 'subscription', label: 'ترقية الباقة', icon: Crown, path: '/subscription', show: true },
+    { id: 'settings', label: 'الإعدادات', icon: Settings, path: '/settings', show: true },
   ];
-
-  const isActive = (path: string) => location.pathname === path;
-
-
 
   // Context to pass to Outlet
   const contextValue: LayoutContextType = {
@@ -273,28 +269,35 @@ const Layout: React.FC = () => {
     }
   };
 
-
-
   return (
-    <div className="min-h-screen md:min-h-0 md:h-screen bg-gray-50 dark:bg-slate-900 flex font-[Cairo] overflow-hidden print:overflow-visible print:h-auto transition-colors duration-300">
-
-      {/* ... Sidebar ... */}
-      <aside className="w-64 flex-col shadow-xl z-30 hidden md:flex border-l border-gray-200 dark:border-slate-800 bg-white dark:bg-[#0b1120] print:hidden">
-        {/* ... existing sidebar content ... */}
-        <div className="p-6 border-b border-gray-100 dark:border-slate-800 flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg">
-            <ShieldCheck className="w-5 h-5" />
+    <div className="flex h-screen bg-white dark:bg-[#0f172a] font-[Cairo]" dir="rtl">
+      {/* Sidebar - Desktop */}
+      <aside className="hidden lg:flex flex-col w-64 border-l border-gray-100 dark:border-slate-800 bg-white dark:bg-[#1e293b]">
+        {/* Logo Area */}
+        <div className="h-16 flex items-center gap-3 px-6 border-b border-gray-100 dark:border-slate-800">
+          <div className="bg-blue-600 p-1.5 rounded-lg">
+            <ShieldCheck className="w-5 h-5 text-white" />
           </div>
-          <span className="text-slate-800 dark:text-white font-bold text-lg">MyFleet Pro</span>
+          <span className="font-bold text-lg text-slate-900 dark:text-white">MyFleet Pro</span>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
           {navItems.filter(item => item.show).map((item) => {
-            const active = isActive(item.path);
+            const isActive = location.pathname === item.path;
+            const Icon = item.icon;
             return (
-              <Link key={item.path} to={item.path} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-bold ${active ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-white'}`}>
-                <item.icon className="w-5 h-5" />
-                <span>{item.label}</span>
+              <Link
+                key={item.id}
+                to={item.path}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${isActive
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+              >
+                <Icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300'}`} />
+                <span className="font-medium text-sm">{item.label}</span>
+                {isActive && <ChevronLeft className="w-4 h-4 mr-auto opacity-50" />}
               </Link>
             );
           })}
@@ -308,133 +311,125 @@ const Layout: React.FC = () => {
             </Link>
           )}
 
-          <div className="mb-4 px-2">
-            <div className="flex items-center gap-2 mb-1">
-              <span className={`w-2 h-2 rounded-full ${userProfile?.role === 'owner' ? 'bg-purple-500' : 'bg-blue-500'}`}></span>
-              <span className="text-xs text-slate-400 uppercase">{userProfile?.role}</span>
+          {/* User Profile Mini Card */}
+          <div className="bg-slate-50 dark:bg-slate-800_ p-3 rounded-xl border border-gray-100 dark:border-slate-700">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 flex items-center justify-center text-white font-bold text-sm shadow-md">
+                {userProfile?.full_name?.charAt(0) || 'U'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                  {userProfile?.full_name || 'مستخدم'}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  {userProfile?.email}
+                </p>
+              </div>
             </div>
-            <div className="text-sm font-bold text-slate-800 dark:text-white truncate">{userProfile?.full_name}</div>
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 py-1.5 rounded-lg text-xs font-bold transition"
+            >
+              <LogOut className="w-3 h-3" /> تسجيل خروج
+            </button>
           </div>
-          <button onClick={handleLogout} className="flex items-center gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 w-full px-4 py-2 rounded-lg transition font-bold text-sm">
-            <LogOut className="w-4 h-4" /> <span>تسجيل خروج</span>
-          </button>
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col h-[100dvh] md:h-screen overflow-hidden print:overflow-visible print:h-auto relative">
 
-        {/* GLOBAL ALERT BANNERS - HIDDEN ON PRINT */}
-        {isFullyBlocked && (
-          <div className="bg-slate-900 text-white px-4 py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-md z-[60] fixed inset-x-0 top-0 print:hidden backdrop-blur-md">
-            <Lock className="w-5 h-5 text-red-500 animate-pulse" />
-            <span>نظام معطل تماماً: انتهت فترة السماح. يرجى التجديد لاستعادة إمكانية الوصول.</span>
-            <a href={`https://wa.me/${systemConfig?.whatsapp_number || ''}`} target="_blank" className="bg-blue-600 px-3 py-1 rounded-lg text-xs hover:bg-blue-500 transition">تحدث معنا للتفعيل</a>
+      {/* Mobile Header - HIDDEN ON PRINT */}
+      <header className="sticky top-0 h-16 bg-white/80 dark:bg-[#1e293b]/90 backdrop-blur-md border-b border-gray-200 dark:border-slate-700 md:hidden flex items-center justify-between px-4 z-40 shrink-0 print:hidden transition-all duration-300">
+        <span className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg">
+            <ShieldCheck className="w-5 h-5" />
           </div>
-        )}
-        {!isFullyBlocked && isInGracePeriod && (
-          <div className="bg-red-600 text-white px-4 py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-md z-30 animate-in slide-in-from-top-full print:hidden">
-            <AlertTriangle className="w-4 h-4" />
-            <span>فترة سماح (صلاحيات محدودة): اشتراكك منتهٍ. سيتوقف النظام تماماً خلال {daysInGraceLeft} أيام.</span>
-          </div>
-        )}
-        {!isFullyBlocked && !isInGracePeriod && !isExpired && isNearExpiry && systemConfig?.show_subscription_banner !== false && (
-          <div className="bg-orange-500 text-white px-4 py-2 text-sm font-bold flex items-center justify-center gap-2 shadow-md z-30 print:hidden">
-            <AlertTriangle className="w-4 h-4" />
-            <span>تنبيه: اشتراكك سينتهي خلال {daysLeft} يوم.</span>
-          </div>
-        )}
-
-        {/* Mobile Header - HIDDEN ON PRINT */}
-        <header className="sticky top-0 h-16 bg-white/80 dark:bg-[#1e293b]/90 backdrop-blur-md border-b border-gray-200 dark:border-slate-700 md:hidden flex items-center justify-between px-4 z-40 shrink-0 print:hidden transition-all duration-300">
-          <span className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-            MyFleet Pro
-          </span>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold">
-              {isOnline ? (
-                <><Wifi className="w-3 h-3 text-emerald-500" /> <span className="text-emerald-500">متصل</span></>
-              ) : (
-                <><WifiOff className="w-3 h-3 text-red-500" /> <span className="text-red-500">أوفلاين</span></>
-              )}
-            </div>
-
-            {/* Mobile Super Admin Link */}
-            {(userProfile?.role === 'super_admin' || userProfile?.role === 'owner') && (
-              <Link to="/admin" className="p-2 rounded-full bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 active:scale-95 transition shadow-sm border border-purple-200 dark:border-purple-800">
-                <Crown className="w-5 h-5" />
-              </Link>
+          MyFleet Pro
+        </span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold">
+            {isOnline ? (
+              <><Wifi className="w-3 h-3 text-emerald-500" /> <span className="text-emerald-500">متصل</span></>
+            ) : (
+              <><WifiOff className="w-3 h-3 text-red-500" /> <span className="text-red-500">أوفلاين</span></>
             )}
-
-            <button onClick={toggleTheme} className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 active:scale-95 transition">
-              {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
-            <button onClick={handleLogout} className="p-2 active:scale-95 transition"><LogOut className="w-5 h-5 text-red-500" /></button>
           </div>
-        </header>
 
-        {/* Desktop Header - HIDDEN ON PRINT */}
-        <header className="h-20 bg-gray-50 dark:bg-[#0f172a] hidden md:flex items-center justify-between px-8 z-20 print:hidden">
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
-            {navItems.find(i => isActive(i.path))?.label || 'لوحة القيادة'}
-          </h2>
-          <button onClick={toggleTheme} className="p-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 hover:text-blue-600 transition shadow-sm">
+          {/* Mobile Super Admin Shortcut - ALWAYS VISIBLE FOR OWNERS */}
+          {(userProfile?.role === 'super_admin' || userProfile?.role === 'owner') && (
+            <Link to="/admin" className="p-2 rounded-full bg-purple-600 text-white shadow-lg shadow-purple-500/30 border border-purple-400 animate-pulse">
+              <Crown className="w-5 h-5" />
+            </Link>
+          )}
+
+          <button onClick={toggleTheme} className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 active:scale-95 transition">
             {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </button>
-        </header>
-
-        <div className="flex-1 overflow-auto p-4 md:p-8 pb-24 relative print:overflow-visible print:p-0 print:pb-0">
-          <Outlet context={contextValue} />
+          <button onClick={handleLogout} className="p-2 active:scale-95 transition"><LogOut className="w-5 h-5 text-red-500" /></button>
         </div>
+      </header>
 
-        {/* Mobile Bottom Nav - HIDDEN ON PRINT */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-[#0f172a]/90 backdrop-blur-lg border-t border-gray-200 dark:border-slate-800 pb-safe pt-1 px-2 z-50 flex justify-around shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] print:hidden">
-          {navItems.filter(item => item.show).slice(0, 5).map((item) => {
-            const active = isActive(item.path);
-            return (
-              <Link key={item.path} to={item.path} className={`relative flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-300 ${active ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>
-                {active && (
-                  <span className="absolute -top-1 w-8 h-1 bg-blue-600 rounded-b-full shadow-blue-500/50 shadow-lg"></span>
-                )}
-                <item.icon className={`w-6 h-6 transition-transform duration-300 ${active ? 'scale-110' : ''}`} />
-                <span className={`text-[10px] font-bold transition-opacity duration-300 ${active ? 'opacity-100' : 'opacity-80'}`}>{item.label}</span>
-              </Link>
-            )
-          })}
-        </div>
-      </main>
+      {/* Desktop Header - HIDDEN ON PRINT */}
+      <header className="h-20 bg-gray-50 dark:bg-[#0f172a] hidden md:flex items-center justify-between px-8 z-20 print:hidden">
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
+          {navItems.find(i => isActive(i.path))?.label || 'لوحة القيادة'}
+        </h2>
+        <button onClick={toggleTheme} className="p-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 hover:text-blue-600 transition shadow-sm">
+          {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+        </button>
+      </header>
 
-      {/* BLOCKING TRIAL EXPIRATION MODAL */}
-      {org?.subscription_plan === 'trial' && isExpired && (
-        <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#1e293b] w-full max-w-md p-8 rounded-3xl shadow-2xl text-center border border-slate-700 animate-in zoom-in-95 duration-300">
-            <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Lock className="w-10 h-10 text-red-500" />
-            </div>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">انتهت الفترة التجريبية</h2>
-            <p className="text-slate-500 dark:text-slate-400 mb-8">
-              أمل أن تكون قد استمتعت بتجربة النظام. لمتابعة استخدام النظام والاحتفاظ ببياناتك، يرجى ترقية باقتك الآن.
-            </p>
+      <div className="flex-1 overflow-auto p-4 md:p-8 pb-24 relative print:overflow-visible print:p-0 print:pb-0">
+        <Outlet context={contextValue} />
+      </div>
 
-            <a
-              href={`https://wa.me/${systemConfig?.whatsapp_number || '966500000000'}?text=السلام عليكم، انتهت الفترة التجريبية وارغب في الاشتراك في الباقة المدفوعة`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition-all hover:scale-[1.02] shadow-lg shadow-emerald-500/20"
-            >
-              <span>تواصل معنا للتفعيل</span>
-              <ArrowRight className="w-5 h-5 rtl:rotate-180" />
-            </a>
+      {/* Mobile Bottom Nav - HIDDEN ON PRINT */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-[#0f172a]/90 backdrop-blur-lg border-t border-gray-200 dark:border-slate-800 pb-safe pt-1 px-2 z-50 flex justify-around shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] print:hidden">
+        {navItems.filter(item => item.show).slice(0, 5).map((item) => {
+          const active = isActive(item.path);
+          return (
+            <Link key={item.path} to={item.path} className={`relative flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-300 ${active ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>
+              {active && (
+                <span className="absolute -top-1 w-8 h-1 bg-blue-600 rounded-b-full shadow-blue-500/50 shadow-lg"></span>
+              )}
+              <item.icon className={`w-6 h-6 transition-transform duration-300 ${active ? 'scale-110' : ''}`} />
+              <span className={`text-[10px] font-bold transition-opacity duration-300 ${active ? 'opacity-100' : 'opacity-80'}`}>{item.label}</span>
+            </Link>
+          )
+        })}
+      </div>
+    </main>
 
-            <p className="text-xs text-slate-500 mt-6">
-              معرف الوكالة: <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">{org.id}</span>
-            </p>
+      {/* BLOCKING TRIAL EXPIRATION MODAL */ }
+  {
+    org?.subscription_plan === 'trial' && isExpired && (
+      <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-[#1e293b] w-full max-w-md p-8 rounded-3xl shadow-2xl text-center border border-slate-700 animate-in zoom-in-95 duration-300">
+          <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Lock className="w-10 h-10 text-red-500" />
           </div>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">انتهت الفترة التجريبية</h2>
+          <p className="text-slate-500 dark:text-slate-400 mb-8">
+            أمل أن تكون قد استمتعت بتجربة النظام. لمتابعة استخدام النظام والاحتفاظ ببياناتك، يرجى ترقية باقتك الآن.
+          </p>
+
+          <a
+            href={`https://wa.me/${systemConfig?.whatsapp_number || '966500000000'}?text=السلام عليكم، انتهت الفترة التجريبية وارغب في الاشتراك في الباقة المدفوعة`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition-all hover:scale-[1.02] shadow-lg shadow-emerald-500/20"
+          >
+            <span>تواصل معنا للتفعيل</span>
+            <ArrowRight className="w-5 h-5 rtl:rotate-180" />
+          </a>
+
+          <p className="text-xs text-slate-500 mt-6">
+            معرف الوكالة: <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">{org.id}</span>
+          </p>
         </div>
-      )}
-    </div>
+      </div>
+    )
+  }
+    </div >
   );
 };
 
