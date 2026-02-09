@@ -5,6 +5,8 @@ import { Loader2 } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider } from './components/ToastProvider';
 import { db } from './lib/db';
+import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute';
+import { performGlobalLogout } from './lib/authUtils';
 
 // Lazy Load Components for Performance Optimization
 const AuthScreen = React.lazy(() => import('./components/AuthScreen'));
@@ -19,6 +21,7 @@ const Assets = React.lazy(() => import('./components/Assets'));
 const LandingPage = React.lazy(() => import('./components/LandingPage'));
 const PricingPage = React.lazy(() => import('./components/PricingPage'));
 const SubscriptionRoute = React.lazy(() => import('./components/SubscriptionRoute'));
+const MaintenancePage = React.lazy(() => import('./components/MaintenancePage'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -27,7 +30,17 @@ const PageLoader = () => (
   </div>
 );
 
-// The "Traffic Controller" Component
+// ====================================================================
+// SECURITY: Cache Configuration
+// ====================================================================
+const MAX_CACHE_AGE = 5 * 60 * 1000; // 5 minutes maximum cache age
+const CACHE_TIMESTAMP_KEY = 'securefleet_session_ts';
+const CACHE_KEY = 'securefleet_session';
+
+// ====================================================================
+// The "Traffic Controller" Component - Enhanced with Cache Validation
+// ====================================================================
+
 const RootRedirect: React.FC = () => {
   const navigate = useNavigate();
   const hasNavigated = React.useRef(false);
@@ -36,54 +49,194 @@ const RootRedirect: React.FC = () => {
     if (hasNavigated.current) return;
 
     const decideRoute = async () => {
-      // 1. Check localStorage first (FAST)
-      const cachedSession = localStorage.getItem('securefleet_session');
+      // ====================================================================
+      // 0. Fetch System Config FIRST (needed for all decisions)
+      // ====================================================================
+      let systemConfig = {
+        maintenance_mode: false,
+        default_entry_page: 'login' as 'landing' | 'pricing' | 'login'
+      };
+
+      try {
+        const { data: configData } = await supabase
+          .from('public_config')
+          .select('maintenance_mode, default_entry_page')
+          .maybeSingle();
+
+        if (configData) {
+          systemConfig = {
+            maintenance_mode: configData.maintenance_mode || false,
+            default_entry_page: configData.default_entry_page || 'login'
+          };
+        }
+        console.log('🔧 System config loaded:', systemConfig);
+      } catch (e) {
+        console.warn('Failed to fetch system config, using defaults:', e);
+      }
+
+      // ====================================================================
+      // 1. Check localStorage first (FAST PATH) - with validation
+      // ====================================================================
+      const cachedSession = localStorage.getItem(CACHE_KEY);
+      const cacheTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+
       if (cachedSession) {
         try {
           const user = JSON.parse(cachedSession);
-          if (user?.id) {
+
+          // SECURITY: Validate cache isn't stale
+          if (cacheTimestamp) {
+            const cacheAge = Date.now() - parseInt(cacheTimestamp, 10);
+
+            if (user?.id && cacheAge < MAX_CACHE_AGE) {
+              // Cache is fresh enough for quick load, BUT verify with server
+              const { data: { session } } = await supabase.auth.getSession();
+
+              if (session && session.user) {
+                // SECURITY: Verify server session matches cached data
+                const { data: profile } = await supabase.from('profiles')
+                  .select('role, org_id, status')
+                  .eq('id', session.user.id)
+                  .maybeSingle();
+
+                // SECURITY: Check if account is disabled
+                if (!profile || profile.status === 'disabled') {
+                  console.warn('⛔ Account is disabled, signing out');
+                  clearCache();
+                  performGlobalLogout({ reason: 'account_disabled' });
+                  return;
+                }
+
+                // MAINTENANCE MODE: Block non-admin users
+                if (systemConfig.maintenance_mode &&
+                    profile.role !== 'admin' &&
+                    profile.role !== 'super_admin' &&
+                    profile.role !== 'owner') {
+                  console.warn('🔧 Maintenance mode active, blocking non-admin user');
+                  hasNavigated.current = true;
+                  navigate('/maintenance', { replace: true });
+                  return;
+                }
+
+                if (profile) {
+                  // Session verified - update cache and proceed
+                  updateCache(profile);
+                  hasNavigated.current = true;
+                  navigate(profile.role === 'admin' && !profile.org_id ? '/admin' : '/dashboard', { replace: true });
+                  return;
+                }
+              }
+            }
+
+            // Cache is stale or invalid - clear it
+            console.log('🔄 Cache is stale or invalid, clearing...');
+            clearCache();
+          }
+        } catch (e) {
+          // Invalid JSON - clear cache
+          console.warn('⚠️ Invalid cache format, clearing...', e);
+          clearCache();
+        }
+      }
+
+      // ====================================================================
+      // 2. Online Check with Server Validation (PRIMARY PATH)
+      // ====================================================================
+      if (navigator.onLine) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+
+          if (session && session.user) {
+            // Fetch full profile with status check
+            const { data: user } = await supabase.from('profiles')
+              .select('role, org_id, status, full_name, email, username, permissions')
+              .eq('id', session.user.id)
+              .maybeSingle();
+
+            // SECURITY: Check if account is disabled
+            if (!user || user.status === 'disabled') {
+              console.warn('⛔ Account is disabled, signing out');
+              clearCache();
+              performGlobalLogout({ reason: 'account_disabled' });
+              return;
+            }
+
+            // MAINTENANCE MODE: Block non-admin users
+            if (systemConfig.maintenance_mode &&
+                user.role !== 'admin' &&
+                user.role !== 'super_admin' &&
+                user.role !== 'owner') {
+              console.warn('🔧 Maintenance mode active, blocking non-admin user');
+              hasNavigated.current = true;
+              navigate('/maintenance', { replace: true });
+              return;
+            }
+
+            // SECURITY: Update cache with fresh data and timestamp
+            updateCache(user);
+
             hasNavigated.current = true;
             navigate(user.role === 'admin' && !user.org_id ? '/admin' : '/dashboard', { replace: true });
             return;
           }
-        } catch (e) { /* Invalid cache, continue */ }
-      }
 
-      // 2. Online Check
-      if (navigator.onLine) {
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            const { data: user } = await supabase.from('profiles').select('role, org_id').eq('id', session.user.id).maybeSingle();
-            if (user) {
-              hasNavigated.current = true;
-              navigate(user.role === 'admin' && !user.org_id ? '/admin' : '/dashboard', { replace: true });
-              return;
-            }
-          }
+          // No valid session - proceed to offline check or default page
         } catch (e) {
           console.error("Auth Check Failed", e);
         }
-      } else {
-        // 3. Offline Fallback Check
-        try {
-          const sessions = await db.sessions.toArray();
-          if (sessions.length > 0) {
-            const s = sessions[0];
-            if (Date.now() < s.expires_at) {
-              hasNavigated.current = true;
-              navigate(s.role === 'admin' && !s.profile.org_id ? '/admin' : '/dashboard', { replace: true });
-              return;
-            }
-          }
-        } catch (e) {
-          console.error("Offline check failed", e);
-        }
       }
 
-      // Default to login
+      // ====================================================================
+      // 3. Offline Fallback Check (INDEXEDDB)
+      // ====================================================================
+      try {
+        const sessions = await db.sessions.toArray();
+
+        if (sessions.length > 0) {
+          const s = sessions[0];
+
+          // Check if offline session hasn't expired
+          if (Date.now() < s.expires_at) {
+            console.log('📱 Using offline session');
+
+            // MAINTENANCE MODE: Check offline session too
+            if (systemConfig.maintenance_mode &&
+                s.role !== 'admin' &&
+                s.role !== 'super_admin' &&
+                s.role !== 'owner') {
+              console.warn('🔧 Maintenance mode active, blocking offline non-admin user');
+              hasNavigated.current = true;
+              navigate('/maintenance', { replace: true });
+              return;
+            }
+
+            hasNavigated.current = true;
+            navigate(s.role === 'admin' && !s.profile.org_id ? '/admin' : '/dashboard', { replace: true });
+            return;
+          } else {
+            console.log('⏰ Offline session expired');
+            // Clear expired offline sessions
+            await db.sessions.clear();
+          }
+        }
+      } catch (e) {
+        console.error("Offline check failed", e);
+      }
+
+      // ====================================================================
+      // 4. No Session - Use Default Entry Page Setting
+      // ====================================================================
+      console.log(`📍 No valid session found, redirecting to: ${systemConfig.default_entry_page}`);
       hasNavigated.current = true;
-      navigate('/login', { replace: true });
+
+      // Route based on default_entry_page setting
+      if (systemConfig.default_entry_page === 'landing') {
+        navigate('/landing', { replace: true });
+      } else if (systemConfig.default_entry_page === 'pricing') {
+        navigate('/pricing', { replace: true });
+      } else {
+        navigate('/login', { replace: true });
+      }
     };
 
     decideRoute();
@@ -91,6 +244,34 @@ const RootRedirect: React.FC = () => {
 
   return <PageLoader />;
 };
+
+// ====================================================================
+// Helper Functions for Cache Management
+// ====================================================================
+
+/**
+ * Clear all auth-related cache from localStorage
+ */
+const clearCache = () => {
+  localStorage.removeItem(CACHE_KEY);
+  localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+};
+
+/**
+ * Update cache with fresh data and current timestamp
+ */
+const updateCache = (user: any) => {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(user));
+    localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+  } catch (e) {
+    console.warn('Failed to update cache:', e);
+  }
+};
+
+// ====================================================================
+// Main App Component
+// ====================================================================
 
 import { ThemeProvider } from './components/ThemeProvider';
 
@@ -113,12 +294,26 @@ const App: React.FC = () => {
                 <Route path="/landing" element={<LandingPage />} />
                 <Route path="/pricing" element={<PricingPage />} />
                 <Route path="/login" element={<AuthScreen />} />
+                <Route path="/maintenance" element={<MaintenancePage />} />
 
-                {/* Super Admin Route - Lazy Loaded */}
-                <Route path="/admin" element={<SuperAdminDashboard />} />
+                {/* Super Admin Route - Protected with AdminRoute */}
+                <Route
+                  path="/admin"
+                  element={
+                    <AdminRoute requiredRole="admin">
+                      <SuperAdminDashboard />
+                    </AdminRoute>
+                  }
+                />
 
-                {/* Protected App Routes (Nested under Layout for Context Access) */}
-                <Route element={<Layout />}>
+                {/* Protected App Routes - Wrapped with ProtectedRoute */}
+                <Route
+                  element={
+                    <ProtectedRoute>
+                      <Layout />
+                    </ProtectedRoute>
+                  }
+                >
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/inventory" element={<Inventory />} />
                   <Route path="/team" element={<Team />} />
