@@ -22,6 +22,7 @@ const LandingPage = React.lazy(() => import('./components/LandingPage'));
 const PricingPage = React.lazy(() => import('./components/PricingPage'));
 const SubscriptionRoute = React.lazy(() => import('./components/SubscriptionRoute'));
 const MaintenancePage = React.lazy(() => import('./components/MaintenancePage'));
+const UpdateRequiredPage = React.lazy(() => import('./components/UpdateRequiredPage'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -36,6 +37,31 @@ const PageLoader = () => (
 const MAX_CACHE_AGE = 5 * 60 * 1000; // 5 minutes maximum cache age
 const CACHE_TIMESTAMP_KEY = 'securefleet_session_ts';
 const CACHE_KEY = 'securefleet_session';
+
+// ====================================================================
+// Version Comparison Helper
+// ====================================================================
+/**
+ * Compare two version strings (e.g., "1.2.3" vs "1.2.4")
+ * Returns: -1 if v1 < v2, 0 if v1 == v2, 1 if v1 > v2
+ */
+const compareVersions = (v1: string, v2: string): number => {
+  const parts1 = v1.split('.').map(Number);
+  const parts2 = v2.split('.').map(Number);
+
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const p1 = parts1[i] || 0;
+    const p2 = parts2[i] || 0;
+
+    if (p1 < p2) return -1;
+    if (p1 > p2) return 1;
+  }
+
+  return 0;
+};
+
+// Current app version (should match package.json)
+const CURRENT_APP_VERSION = '1.0.0';
 
 // ====================================================================
 // The "Traffic Controller" Component - Enhanced with Cache Validation
@@ -54,24 +80,36 @@ const RootRedirect: React.FC = () => {
       // ====================================================================
       let systemConfig = {
         maintenance_mode: false,
-        default_entry_page: 'login' as 'landing' | 'pricing' | 'login'
+        default_entry_page: 'login' as 'landing' | 'pricing' | 'login',
+        min_app_version: '1.0.0' as string
       };
 
       try {
         const { data: configData } = await supabase
           .from('public_config')
-          .select('maintenance_mode, default_entry_page')
+          .select('maintenance_mode, default_entry_page, min_app_version')
           .maybeSingle();
 
         if (configData) {
           systemConfig = {
             maintenance_mode: configData.maintenance_mode || false,
-            default_entry_page: configData.default_entry_page || 'login'
+            default_entry_page: configData.default_entry_page || 'login',
+            min_app_version: configData.min_app_version || '1.0.0'
           };
         }
         console.log('🔧 System config loaded:', systemConfig);
       } catch (e) {
         console.warn('Failed to fetch system config, using defaults:', e);
+      }
+
+      // ====================================================================
+      // 0.1. Check Minimum App Version (ENFORCE FOR ALL USERS)
+      // ====================================================================
+      if (systemConfig.min_app_version && compareVersions(CURRENT_APP_VERSION, systemConfig.min_app_version) < 0) {
+        console.warn(`⚠️ App version ${CURRENT_APP_VERSION} is below minimum required ${systemConfig.min_app_version}`);
+        hasNavigated.current = true;
+        navigate('/update-required', { replace: true });
+        return;
       }
 
       // ====================================================================
@@ -295,6 +333,7 @@ const App: React.FC = () => {
                 <Route path="/pricing" element={<PricingPage />} />
                 <Route path="/login" element={<AuthScreen />} />
                 <Route path="/maintenance" element={<MaintenancePage />} />
+                <Route path="/update-required" element={<UpdateRequiredPage currentVersion={CURRENT_APP_VERSION} minVersion={undefined} updateUrl={undefined} />} />
 
                 {/* Super Admin Route - Protected with AdminRoute */}
                 <Route

@@ -11,9 +11,10 @@ import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Bell, Menu, X, Users, Settings, Plus, Check, Save, Trash2, Eye, EyeOff, Building, Package, CreditCard, Lock, Loader2, Edit, UserPlus, Clock, Car, LayoutDashboard, Sparkles, ChevronLeft, Target, ArrowUpRight, PieChart, Power, UserCheck, UserX, Shield, FileText, AlertCircle, Search, Calendar, Tag, Receipt, CheckCircle2, XCircle, DollarSign, Percent, Image, ExternalLink } from 'lucide-react';
+import WhatsAppSection from './WhatsAppSection';
 
 // Types
-type OrgTab = 'info' | 'plan' | 'users' | 'permissions' | 'security';
+type OrgTab = 'info' | 'plan' | 'users' | 'permissions' | 'security' | 'whatsapp';
 
 interface DashboardStats {
     totalOrgs: number;
@@ -47,7 +48,7 @@ const SuperAdminDashboard: React.FC = () => {
     const [currentUser, setCurrentUser] = useState<Profile | null>(null);
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [activeSection, setActiveSection] = useState<'overview' | 'users' | 'organizations' | 'announcements' | 'plans' | 'discounts' | 'payments' | 'logs' | 'settings' | 'analytics'>('overview');
+    const [activeSection, setActiveSection] = useState<'overview' | 'users' | 'organizations' | 'announcements' | 'plans' | 'discounts' | 'payments' | 'logs' | 'settings' | 'analytics' | 'whatsapp'>('overview');
 
     // RADICAL FIX: Start with FALSE to force render immediately. No more white screen.
     // Page loading state removed as it was unused and hardcoded to false
@@ -170,6 +171,7 @@ const SuperAdminDashboard: React.FC = () => {
         { id: 'plans', label: 'الباقات', icon: Package },
         { id: 'discounts', label: 'أكواد الخصم', icon: Tag },
         { id: 'payments', label: 'طلبات الدفع', icon: Receipt },
+        { id: 'whatsapp', label: 'واتساب', icon: ExternalLink },
         { id: 'logs', label: 'سجل النشاطات', icon: Shield },
         { id: 'settings', label: 'إعدادات النظام', icon: Settings },
     ];
@@ -247,7 +249,7 @@ transition-all duration-300 ease-in-out
                         <button
                             key={item.id}
                             onClick={() => {
-                                setActiveSection(item.id as 'overview' | 'users' | 'organizations' | 'announcements' | 'plans' | 'discounts' | 'payments' | 'logs' | 'settings' | 'analytics');
+                                setActiveSection(item.id as 'overview' | 'users' | 'organizations' | 'announcements' | 'plans' | 'discounts' | 'payments' | 'logs' | 'settings' | 'analytics' | 'whatsapp');
                                 setMobileMenuOpen(false);
                             }}
                             className={`
@@ -313,6 +315,7 @@ w-full flex items-center gap-3 px-3 lg:px-4 py-3 lg:py-3.5 rounded-xl transition
                             {activeSection === 'plans' && <PlansSection />}
                             {activeSection === 'discounts' && <DiscountCodesSection />}
                             {activeSection === 'payments' && <PaymentRequestsSection />}
+                            {activeSection === 'whatsapp' && <WhatsAppSection />}
                             {activeSection === 'logs' && <AuditLogsSection />}
                             {activeSection === 'settings' && <SystemSettingsSection />}
                         </>
@@ -733,6 +736,9 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
     const [saving, setSaving] = useState(false);
     const [formData, setFormData] = useState({ ...org });
 
+    // Owner State
+    const [ownerProfile, setOwnerProfile] = useState<Profile | null>(null);
+
     // Users Tab State
     const [orgUsers, setOrgUsers] = useState<Profile[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
@@ -746,10 +752,16 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
     const [resetConfig, setResetConfig] = useState({ userId: '', newPassword: '' });
     const [resettingPass, setResettingPass] = useState(false);
 
-
     useEffect(() => {
         if (activeTab === 'users' || activeTab === 'security') fetchOrgUsers();
+        // Always fetch owner info for the Info tab
+        fetchOwnerInfo();
     }, [activeTab]);
+
+    const fetchOwnerInfo = async () => {
+        const { data } = await supabase.from('profiles').select('*').eq('org_id', org.id).eq('role', 'owner').single();
+        if (data) setOwnerProfile(data);
+    };
 
     const fetchOrgUsers = async () => {
         setLoadingUsers(true);
@@ -760,21 +772,39 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
 
     const handleSave = async () => {
         setSaving(true);
-        const { error } = await supabase.from('organizations').update({
+
+        // 1. Update Organization
+        const { error: orgError } = await supabase.from('organizations').update({
             name: formData.name,
             subscription_plan: formData.subscription_plan,
             subscription_start: formData.subscription_start,
             subscription_end: formData.subscription_end,
             manual_extension_end: formData.manual_extension_end || null,
             is_active: formData.is_active,
-            settings: formData.settings // Save settings including custom_features
+            settings: formData.settings
         }).eq('id', org.id);
 
-        setSaving(false);
-        if (error) alert('خطأ أثناء الحفظ: ' + error.message);
-        else {
-            onUpdate();
+        if (orgError) {
+            setSaving(false);
+            return alert('خطأ أثناء حفظ المنظمة: ' + orgError.message);
         }
+
+        // 2. Update Owner Profile (if changed)
+        if (ownerProfile) {
+            const { error: profileError } = await supabase.from('profiles').update({
+                full_name: ownerProfile.full_name,
+                whatsapp_number: ownerProfile.whatsapp_number
+            }).eq('id', ownerProfile.id);
+
+            if (profileError) {
+                console.error('Error updating owner:', profileError);
+                // We don't block success, just warn
+                alert('تم حفظ المنظمة ولكن فشل تحديث بيانات المالك: ' + profileError.message);
+            }
+        }
+
+        setSaving(false);
+        onUpdate();
     };
 
     const handleBulkPermissions = async () => {
@@ -895,8 +925,8 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
     };
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-            <div className="bg-slate-900 w-full max-w-4xl max-h-[90vh] md:max-h-[85vh] rounded-2xl border border-slate-700 flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 relative">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-0 md:p-4">
+            <div className="bg-slate-900 w-full h-full md:h-auto md:max-h-[85vh] md:max-w-4xl md:rounded-2xl border-0 md:border border-slate-700 flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 relative">
 
                 {/* Header */}
                 <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">
@@ -918,6 +948,31 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
                     <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition">
                         <X className="w-6 h-6 text-slate-400" />
                     </button>
+                </div>
+
+                {/* Mobile Tabs Navigation */}
+                <div className="md:hidden border-b border-slate-800 bg-slate-950 overflow-x-auto">
+                    <div className="flex p-2 gap-2 min-w-max">
+                        {[
+                            { id: 'info', label: 'المعلومات', icon: Building },
+                            { id: 'plan', label: 'الاشتراك', icon: CreditCard },
+                            { id: 'users', label: 'المستخدمين', icon: Users },
+                            { id: 'permissions', label: 'الصلاحيات', icon: Shield },
+                            { id: 'security', label: 'الأمان', icon: Lock },
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id as OrgTab)}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition ${activeTab === tab.id
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-slate-900 text-slate-400 border border-slate-800'
+                                    }`}
+                            >
+                                <tab.icon className="w-3.5 h-3.5" />
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 {/* Tabs & Content Wrapper */}
@@ -957,6 +1012,30 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
                                         onChange={e => setFormData({ ...formData, name: e.target.value })}
                                         className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none focus:border-blue-500"
                                     />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label htmlFor="owner-name" className="block text-sm font-bold text-slate-400 mb-2">اسم المالك</label>
+                                        <input
+                                            id="owner-name"
+                                            value={ownerProfile?.full_name || ''}
+                                            onChange={e => ownerProfile && setOwnerProfile({ ...ownerProfile, full_name: e.target.value })}
+                                            className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none focus:border-blue-500"
+                                            placeholder="اسم المالك غير متوفر"
+                                            disabled={!ownerProfile}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="owner-phone" className="block text-sm font-bold text-slate-400 mb-2">هاتف المالك</label>
+                                        <input
+                                            id="owner-phone"
+                                            value={ownerProfile?.whatsapp_number || ''}
+                                            onChange={e => ownerProfile && setOwnerProfile({ ...ownerProfile, whatsapp_number: e.target.value })}
+                                            className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none focus:border-blue-500"
+                                            placeholder="رقم الهاتف..."
+                                            disabled={!ownerProfile}
+                                        />
+                                    </div>
                                 </div>
                                 <div>
                                     <label htmlFor="org-status" className="block text-sm font-bold text-slate-400 mb-2">الحالة</label>
@@ -1123,6 +1202,9 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
                                     <div>
                                         <p className="font-bold mb-1">تخصيص الصلاحيات والميزات</p>
                                         <p>هذه الخيارات تتجاوز (Override) إعدادات الباقة الافتراضية. يمكنك تفعيل أو تعطيل وحدات معينة لهذه المنظمة خصيصاً.</p>
+                                        {formData.subscription_plan === 'trial' && (
+                                            <p className="mt-2 text-emerald-400 font-bold">⚠️ باقة Trial: جميع الميزات مفعلة افتراضياً.</p>
+                                        )}
                                     </div>
                                 </div>
 
@@ -1141,7 +1223,9 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
                                         ].map(item => {
                                             const settings = (formData.settings as { custom_features?: Record<string, boolean> });
                                             const customFeatures = settings?.custom_features || {};
-                                            const isEnabled = !!customFeatures[item.k];
+                                            // Feature is enabled IF it's in customFeatures OR if plan is 'trial' (Trial has everything)
+                                            const isEnabled = (formData.subscription_plan === 'trial') || !!customFeatures[item.k];
+
                                             return (
                                                 <label key={item.k} className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition ${isEnabled
                                                     ? 'bg-blue-500/10 border-blue-500/50'
@@ -1157,6 +1241,7 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
                                                         aria-label={item.l}
                                                         type="checkbox"
                                                         checked={!!isEnabled}
+                                                        disabled={formData.subscription_plan === 'trial'}
                                                         onChange={(e) => {
                                                             const settings = formData.settings as { custom_features?: Record<string, boolean> };
                                                             const currentFeatures = settings?.custom_features || {};
@@ -2093,6 +2178,30 @@ const SystemSettingsSection: React.FC = () => {
                             placeholder="966500000000"
                         />
                         <p className="text-xs text-slate-500 mt-2">* في حال عدم تحديد أرقام للدفع أعلاه، سيتم استخدام هذا الرقم افتراضياً.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="support-contact" className="block text-sm font-bold text-slate-400 mb-2">رقم الدعم الفني</label>
+                            <input
+                                id="support-contact"
+                                value={config?.support_contact || ''}
+                                onChange={e => setConfig(prev => prev ? { ...prev, support_contact: e.target.value } : null)}
+                                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-purple-500 outline-none"
+                                placeholder="0123456789"
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="survey-link" className="block text-sm font-bold text-slate-400 mb-2">رابط الاستبيان</label>
+                            <input
+                                id="survey-link"
+                                value={config?.survey_link || ''}
+                                onChange={e => setConfig(prev => prev ? { ...prev, survey_link: e.target.value } : null)}
+                                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-purple-500 outline-none"
+                                placeholder="https://survey.example.com"
+                            />
+                        </div>
                     </div>
 
                     <button

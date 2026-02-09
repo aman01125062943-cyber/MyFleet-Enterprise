@@ -30,6 +30,7 @@ export interface UserPermissions {
   reports: {
     view: boolean;
   };
+  [key: string]: { [key: string]: boolean } | undefined;
 }
 
 export interface Profile {
@@ -148,6 +149,7 @@ export interface PlanFeatures {
   assets?: boolean;
   advanced_reports?: boolean;
   alerts?: boolean;
+  [key: string]: boolean | number | undefined;
 }
 
 export interface Plan {
@@ -303,6 +305,8 @@ export interface SystemConfig {
   grace_period_days?: number; // Default: 7 days
   grace_period_allowed_modules?: (keyof UserPermissions)[]; // e.g. ['inventory']
   available_plans: Plan[];
+  survey_link?: string;
+  support_contact?: string;
 }
 
 export interface AuditLog {
@@ -328,4 +332,102 @@ export interface ExpenseTemplate {
   type: 'income' | 'expense'; // New field
   is_active: boolean;
   created_at?: string;
+}
+
+// ==================== WhatsApp Types ====================
+
+export interface WhatsAppSession {
+  id: string;
+  org_id: string;
+  name: string;
+  phone_number?: string;
+  status: 'initializing' | 'connected' | 'disconnected';
+  connected_at?: string;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  connected?: boolean;
+  waName?: string;
+}
+
+export interface WhatsAppMessage {
+  id: string;
+  session_id: string;
+  recipient: string;
+  content: string;
+  type: 'text' | 'template';
+  status: 'sent' | 'failed' | 'pending';
+  error_message?: string;
+  sent_at?: string;
+  created_at: string;
+}
+
+export interface WhatsAppTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  content: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface NotificationQueue {
+  id: string;
+  org_id: string;
+  recipient_phone: string;
+  template_id?: string;
+  variables?: Record<string, string>;
+  status: 'pending' | 'sent' | 'failed';
+  scheduled_at?: string;
+  sent_at?: string;
+  error_message?: string;
+  created_at: string;
+}
+
+export interface WhatsAppNotificationLog {
+  id: number;
+  notification_type: 'trial_welcome' | 'paid_welcome' | 'expiry_reminder' | 'expiry_urgent';
+  org_id: string;
+  user_id: string;
+  phone_number: string;
+  status: 'pending' | 'sent' | 'failed';
+  error_message?: string;
+  sent_at?: string;
+  created_at: string;
+}
+
+export interface WhatsAppNotificationQueue {
+  id: number;
+  org_id: string;
+  user_id?: string;
+  phone_number: string;
+  notification_type: 'trial_welcome' | 'paid_welcome' | 'expiry_reminder' | 'expiry_urgent';
+  variables?: Record<string, string | number>;
+  status: 'pending' | 'processing' | 'sent' | 'failed';
+  error_message?: string;
+  retry_count: number;
+  created_at: string;
+  processed_at?: string;
+}
+
+export interface WhatsAppNotificationSettings {
+  whatsapp_enabled: boolean;
+  trial_welcome_enabled: boolean;
+  paid_welcome_enabled: boolean;
+  expiry_reminders_enabled: boolean;
+  reminder_days: number[];
+}
+
+export interface WhatsAppAuditLog {
+  id: string;
+  admin_id: string;
+  action: string;
+  entity: string;
+  entity_id: string;
+  details: Record<string, unknown>;
+  ip_address?: string;
+  created_at: string;
+  admin_name?: string;
+  admin_email?: string;
 }
