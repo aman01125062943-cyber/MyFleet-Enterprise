@@ -10,8 +10,9 @@ import { Profile, Organization, SystemConfig, Plan, AuditLog, UserPermissions, P
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Bell, Menu, X, Users, Settings, Plus, Check, Save, Trash2, Eye, EyeOff, Building, Package, CreditCard, Lock, Loader2, Edit, UserPlus, Clock, Car, LayoutDashboard, Sparkles, ChevronLeft, Target, ArrowUpRight, PieChart, Power, UserCheck, UserX, Shield, FileText, AlertCircle, Search, Calendar, Tag, Receipt, CheckCircle2, XCircle, DollarSign, Percent, Image, ExternalLink } from 'lucide-react';
+import { Bell, Menu, X, Users, Settings, Plus, Check, Save, Trash2, Eye, EyeOff, Building, Package, CreditCard, Lock, Loader2, Edit, UserPlus, Clock, Car, LayoutDashboard, Sparkles, ChevronLeft, Target, ArrowUpRight, PieChart, Power, UserCheck, UserX, Shield, FileText, AlertCircle, Search, Calendar, Tag, Receipt, CheckCircle2, XCircle, DollarSign, Percent, Image, ExternalLink, Activity } from 'lucide-react';
 import WhatsAppSection from './WhatsAppSection';
+import HealthMonitorSection from './whatsapp/HealthMonitorSection';
 
 // Types
 type OrgTab = 'info' | 'plan' | 'users' | 'permissions' | 'security' | 'whatsapp';
@@ -48,7 +49,7 @@ const SuperAdminDashboard: React.FC = () => {
     const [currentUser, setCurrentUser] = useState<Profile | null>(null);
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [activeSection, setActiveSection] = useState<'overview' | 'users' | 'organizations' | 'announcements' | 'plans' | 'discounts' | 'payments' | 'logs' | 'settings' | 'analytics' | 'whatsapp'>('overview');
+    const [activeSection, setActiveSection] = useState<'overview' | 'users' | 'organizations' | 'announcements' | 'plans' | 'discounts' | 'payments' | 'logs' | 'settings' | 'analytics' | 'whatsapp' | 'health'>('overview');
 
     // RADICAL FIX: Start with FALSE to force render immediately. No more white screen.
     // Page loading state removed as it was unused and hardcoded to false
@@ -172,6 +173,7 @@ const SuperAdminDashboard: React.FC = () => {
         { id: 'discounts', label: 'أكواد الخصم', icon: Tag },
         { id: 'payments', label: 'طلبات الدفع', icon: Receipt },
         { id: 'whatsapp', label: 'واتساب', icon: ExternalLink },
+        { id: 'health', label: 'مراقبة النظام', icon: Activity },
         { id: 'logs', label: 'سجل النشاطات', icon: Shield },
         { id: 'settings', label: 'إعدادات النظام', icon: Settings },
     ];
@@ -249,7 +251,7 @@ transition-all duration-300 ease-in-out
                         <button
                             key={item.id}
                             onClick={() => {
-                                setActiveSection(item.id as 'overview' | 'users' | 'organizations' | 'announcements' | 'plans' | 'discounts' | 'payments' | 'logs' | 'settings' | 'analytics' | 'whatsapp');
+                                setActiveSection(item.id as 'overview' | 'users' | 'organizations' | 'announcements' | 'plans' | 'discounts' | 'payments' | 'logs' | 'settings' | 'analytics' | 'whatsapp' | 'health');
                                 setMobileMenuOpen(false);
                             }}
                             className={`
@@ -316,6 +318,7 @@ w-full flex items-center gap-3 px-3 lg:px-4 py-3 lg:py-3.5 rounded-xl transition
                             {activeSection === 'discounts' && <DiscountCodesSection />}
                             {activeSection === 'payments' && <PaymentRequestsSection />}
                             {activeSection === 'whatsapp' && <WhatsAppSection />}
+                            {activeSection === 'health' && <HealthMonitorSection />}
                             {activeSection === 'logs' && <AuditLogsSection />}
                             {activeSection === 'settings' && <SystemSettingsSection />}
                         </>
