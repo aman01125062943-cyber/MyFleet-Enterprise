@@ -140,6 +140,13 @@ const SubscriptionPage: React.FC<SubscriptionPageProps> = ({
     const submitPaymentRequest = async () => {
         if (!selectedPlan || !paymentMethod || !receiptFile) return;
 
+        // منع إرسال الطلب في وضع المعاينة
+        if (organization.id === 'preview_mode') {
+            alert('⚠️ وضع المعاينة: لا يمكن إرسال طلب دفع فعلي. يرجى تسجيل الدخول بحساب مستخدم عادي لإتمام العملية.');
+            setSubmitting(false);
+            return;
+        }
+
         setSubmitting(true);
 
         try {
@@ -195,29 +202,39 @@ const SubscriptionPage: React.FC<SubscriptionPageProps> = ({
     };
 
     const sendToWhatsApp = (receiptUrl: string, prices: { original: number; discount: number; final: number }) => {
+        const paymentMethodDisplay = paymentMethod === 'instapay'
+            ? `💳 *InstaPay*`
+            : `📱 *Vodafone Cash*`;
+
         const message = `
-🚗 *طلب اشتراك جديد - مدير الأسطول*
+━━━━━━━━━━━━━━━━━━━━━
+🚗 *طلب اشتراك جديد*
+   *مدير الأسطول*
+━━━━━━━━━━━━━━━━━━━━━
 
-👤 *بيانات العميل:*
-• الاسم: ${user.full_name}
-• المنشأة: ${organization.name}
-• البريد: ${user.email || 'غير متوفر'}
+👤 *العميل:*
+▪️ الاسم: ${user.full_name}
+▪️ المنشأة: ${organization.name}
+▪️ البريد: ${user.email || 'غير متوفر'}
 
+━━━━━━━━━━━━━━━━━━━━━
 📦 *تفاصيل الاشتراك:*
-• الباقة: ${selectedPlan?.name_ar}
-• الدورة: ${billingCycle === 'yearly' ? 'سنوي' : 'شهري'}
-• السعر الأصلي: ${prices.original} جنيه
-${prices.discount > 0 ? `• الخصم: ${prices.discount} جنيه (كود: ${discountCode})` : ''}
-• السعر النهائي: *${prices.final} جنيه*
+▪️ الباقة: ${selectedPlan?.name_ar}
+▪️ الدورة: ${billingCycle === 'yearly' ? '📅 سنوي' : '📆 شهري'}
+▪️ السعر: ${prices.original} جنيه
+${prices.discount > 0 ? `▪️ 💰 الخصم: ${prices.discount} جنيه` : ''}
+▪️ ✅ *الإجمالي: ${prices.final} جنيه*
 
-💳 *بيانات الدفع:*
-• طريقة الدفع: ${paymentMethod === 'instapay' ? 'InstaPay' : 'Vodafone Cash'}
-• الرقم المرجعي: ${referenceNumber || 'غير متوفر'}
+━━━━━━━━━━━━━━━━━━━━━
+${paymentMethodDisplay}
+▪️ الرقم المرجعي: ${referenceNumber || 'غير متوفر'}
 
+━━━━━━━━━━━━━━━━━━━━━
 📎 *إيصال الدفع:*
 ${receiptUrl}
 
-⏰ *التاريخ:* ${new Date().toLocaleDateString('ar-EG')} - ${new Date().toLocaleTimeString('ar-EG')}
+━━━━━━━━━━━━━━━━━━━━━
+⏰ ${new Date().toLocaleDateString('ar-EG')} - ${new Date().toLocaleTimeString('ar-EG')}
         `.trim();
 
         const encodedMessage = encodeURIComponent(message);

@@ -265,7 +265,7 @@ const Layout: React.FC = () => {
 
     // ✅ استخدام planPermissionGuard للتحقق من حدود الباقة
     const planId = org?.subscription_plan || 'trial';
-    if (!checkPlanPermission({ permissions: userProfile?.permissions || {} } as any, planId, module, action)) {
+    if (!checkPlanPermission(userProfile?.permissions || {} as any, planId, module, action)) {
       return false;
     }
 

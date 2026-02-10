@@ -11,8 +11,8 @@ interface PricingSectionProps {
 const PricingSection: React.FC<PricingSectionProps> = ({ plans, onSelectPlan }) => {
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
 
-    const trialPlan = plans.find(p => p.price === 0);
-    const displayedPlans = plans.filter(p => p.interval === billingCycle && p.price > 0);
+    const trialPlan = plans.find(p => p.price_monthly === 0);
+    const displayedPlans = plans.filter(p => p.price_monthly > 0 || p.price_yearly > 0);
 
     return (
         <div className="py-12 bg-slate-950" id="pricing">
@@ -52,7 +52,8 @@ const PricingSection: React.FC<PricingSectionProps> = ({ plans, onSelectPlan }) 
 };
 
 const PricingCard: React.FC<{ plan: Plan, onSelect: (p: Plan) => void, billingCycle?: 'monthly' | 'yearly' }> = ({ plan, onSelect, billingCycle }) => {
-    const isTrial = plan.price === 0;
+    const currentPrice = billingCycle === 'yearly' ? plan.price_yearly : plan.price_monthly;
+    const isTrial = currentPrice === 0;
     const isFeatured = plan.is_featured;
 
     let buttonClass = "w-full py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 ";
@@ -75,8 +76,8 @@ const PricingCard: React.FC<{ plan: Plan, onSelect: (p: Plan) => void, billingCy
             <div className="mb-6">
                 <h3 className="text-xl font-bold text-white mb-2">{plan.name_ar}</h3>
                 <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold text-white">{plan.price === 0 ? 'مجاناً' : plan.price}</span>
-                    <span className="text-sm text-slate-400">{plan.price === 0 ? '' : 'ج.م'}</span>
+                    <span className="text-4xl font-bold text-white">{currentPrice === 0 ? 'مجاناً' : currentPrice}</span>
+                    <span className="text-sm text-slate-400">{currentPrice === 0 ? '' : 'ج.م'}</span>
                     <span className="text-sm text-slate-500">/{billingCycle === 'yearly' ? 'سنوياً' : 'شهرياً'}</span>
                 </div>
                 {plan.price_before_discount && (
