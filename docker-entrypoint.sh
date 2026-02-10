@@ -1,7 +1,13 @@
 #!/bin/sh
 set -e
 
-# Inject environment variables into env-config.js at runtime
+# 1. تحديث منفذ Nginx ليتوافق مع Render (الافتراضي 80 إذا لم يوجد PORT)
+NGINX_CONF="/etc/nginx/conf.d/default.conf"
+PORT="${PORT:-80}"
+sed -i "s/listen 80;/listen ${PORT};/g" "$NGINX_CONF"
+echo "🌐 Nginx configured to listen on port ${PORT}"
+
+# 2. حقن متغيرات البيئة في env-config.js ليستخدمها التطبيق (الفرونت إند)
 ENV_CONFIG="/usr/share/nginx/html/env-config.js"
 
 echo "window._env_ = {" > "$ENV_CONFIG"
@@ -13,5 +19,5 @@ echo "};" >> "$ENV_CONFIG"
 
 echo "✅ Environment variables injected into env-config.js"
 
-# Start nginx
+# 3. تشغيل Nginx
 exec "$@"
