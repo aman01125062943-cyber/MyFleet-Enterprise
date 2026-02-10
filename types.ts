@@ -30,6 +30,16 @@ export interface UserPermissions {
   reports: {
     view: boolean;
   };
+  // صلاحيات إدارة الاشتراكات
+  subscription: {
+    view_requests: boolean;      // عرض طلبات الدفع
+    approve_requests: boolean;   // الموافقة على الطلبات
+    reject_requests: boolean;    // رفض الطلبات
+    manage_plans: boolean;       // إدارة الباقات والأسعار
+    manage_discounts: boolean;   // إدارة أكواد الخصم
+    view_reports: boolean;       // عرض تقارير الإيرادات
+    manage_notifications: boolean; // إدارة الرسائل التلقائية
+  };
   [key: string]: { [key: string]: boolean } | undefined;
 }
 
@@ -41,6 +51,7 @@ export interface Profile {
   org_id?: string;
   role?: string; // 'super_admin' | 'owner' | 'admin' | 'supervisor' | 'staff'
   status?: 'active' | 'disabled';
+  whatsapp_number?: string;
   permissions: UserPermissions;
   settings?: {
     transaction_categories?: {

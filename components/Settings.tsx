@@ -9,6 +9,7 @@ import {
   Building, CreditCard, Lock, Save, Loader2, Printer, TrendingUp, TrendingDown, Edit
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { performGlobalLogout } from '../lib/authUtils';
 
 const Settings: React.FC = () => {
   const navigate = useNavigate();
@@ -76,8 +77,8 @@ const Settings: React.FC = () => {
   // --- Handlers ---
 
   const handleLogout = () => {
-    localStorage.removeItem('securefleet_session');
-    navigate('/');
+    // Use centralized logout function
+    performGlobalLogout({ reason: 'user_initiated' });
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -86,9 +87,13 @@ const Settings: React.FC = () => {
     if (passwordData.new !== passwordData.confirm) {
       showToast('كلمة المرور الجديدة غير متطابقة', 'error'); return;
     }
+    if (passwordData.new.length < 6) {
+      showToast('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error'); return;
+    }
     setActionLoading(true);
-    const { error } = await supabase.rpc('update_password_secure', {
-      p_user_id: currentUser.id, p_new_password: passwordData.new
+    // استخدام Supabase Auth API بدلاً من RPC القديم
+    const { error } = await supabase.auth.updateUser({
+      password: passwordData.new
     });
     setActionLoading(false);
     if (!error) {

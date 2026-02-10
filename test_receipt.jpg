@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300">
+  <rect width="400" height="300" fill="#ffffff"/>
+  <text x="20" y="40" font-family="Arial" font-size="18" font-weight="bold">Vodafone Cash</text>
+  <text x="20" y="70" font-family="Arial" font-size="14">تم تحويل مبلغ</text>
+  <text x="20" y="100" font-family="Arial" font-size="20" font-weight="bold">399.00 ج.م</text>
+  <text x="20" y="130" font-family="Arial" font-size="14">إلى: 201066284516</text>
+  <text x="20" y="160" font-family="Arial" font-size="14">التاريخ: 2026-02-09</text>
+  <text x="20" y="190" font-family="Arial" font-size="14">رقم العملية: 1234567890</text>
+  <text x="20" y="220" font-family="Arial" font-size="12" fill="#00aa00">✓ تم بنجاح</text>
+</svg>

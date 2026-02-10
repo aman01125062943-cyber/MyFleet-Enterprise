@@ -7,7 +7,7 @@ import sonarjs from "eslint-plugin-sonarjs";
 export default [
     js.configs.recommended,
     {
-        ignores: ["dist/**", "node_modules/**", "db_scripts_archive/**", "maintenance_scripts/**", ".agent/**", "eslint.config.js", "postcss.config.js", "tailwind.config.js", "vite.config.ts", "tsconfig.json"]
+        ignores: ["dist/**", "node_modules/**", "db_scripts_archive/**", "maintenance_scripts/**", ".agent/**", "eslint.config.js", "postcss.config.js", "tailwind.config.js", "vite.config.ts", "tsconfig.json", "whatsapp-service/**"]
     },
     {
         files: ["**/*.ts", "**/*.tsx"],
@@ -138,6 +138,19 @@ export default [
             "sonarjs/no-dead-store": "warn",
             "sonarjs/use-type-alias": "warn",
             "sonarjs/slow-regex": "warn"
+        }
+    },
+    {
+        files: ["whatsapp-server/**/*.js"],
+        languageOptions: {
+            sourceType: "module",
+            globals: {
+                process: "readonly",
+                console: "readonly",
+                Buffer: "readonly",
+                __dirname: "readonly",
+                __filename: "readonly"
+            }
         }
     }
 ];

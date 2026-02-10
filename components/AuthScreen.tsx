@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, Loader2, Building2, User, Key, AlertCircle, ArrowRight, Lock, Mail } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ShieldCheck, Loader2, Building2, User, Key, AlertCircle, ArrowRight, Lock, Mail, Eye, EyeOff, ArrowRight as ArrowRightIcon } from 'lucide-react';
 import { db } from '../lib/db';
 import { SystemConfig } from '../types';
 
@@ -15,16 +14,32 @@ const AuthScreen: React.FC = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
 
+    // ✨ NEW: Remember Me state
+    const [rememberMe, setRememberMe] = useState(false);
+
     // Register Data (Only if allowed)
     const [orgName, setOrgName] = useState('');
     const [ownerName, setOwnerName] = useState('');
     const [regUsername, setRegUsername] = useState('');
     const [regPassword, setRegPassword] = useState('');
 
+    // ✨ NEW: Show/Hide Password state
+    const [showLoginPassword, setShowLoginPassword] = useState(false);
+    const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+
     const [errorMsg, setErrorMsg] = useState('');
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+
+    // Fix: Move state up to avoid "not defined" errors and detect mode
+    const [whatsappNumber, setWhatsappNumber] = useState('');
 
     useEffect(() => {
+        // Smart Redirect: Check if mode is register
+        if (searchParams.get('mode') === 'register') {
+            setIsLogin(false);
+        }
+
         const fetchConfig = async () => {
             const { data } = await supabase.from('public_config').select().maybeSingle();
             if (data) {
@@ -121,17 +136,28 @@ const AuthScreen: React.FC = () => {
                     orgData = org;
                 }
 
-                // 3. Cache for Offline Use
+                // 3. Cache for Offline Use with extended expiry if rememberMe is checked
+                const sessionExpiry = rememberMe 
+                    ? Date.now() + (30 * 24 * 60 * 60 * 1000) // 30 days if rememberMe
+                    : Date.now() + (authData.session.expires_in * 1000); // Default expiry
+
                 await db.sessions.put({
                     id: authData.user.id,
                     token: authData.session.access_token,
                     role: profileData.role,
                     profile: { ...profileData, email: username }, // Store email explicitly
                     org: orgData,
-                    expires_at: Date.now() + (authData.session.expires_in * 1000)
+                    expires_at: sessionExpiry // Use calculated expiry
                 });
 
-                // 4. Register Device (Optional Sync)
+                // 4. Save Remember Me preference
+                if (rememberMe) {
+                    localStorage.setItem('securefleet_remember_me', 'true');
+                } else {
+                    localStorage.removeItem('securefleet_remember_me');
+                }
+
+                // 5. Register Device (Optional Sync)
                 await registerDevice();
 
                 navigate('/dashboard');
@@ -178,9 +204,38 @@ const AuthScreen: React.FC = () => {
             return;
         }
 
+        if (whatsappNumber.length < 10) {
+            setErrorMsg('يرجى إدخال رقم واتساب صحيح للتواصل.');
+            return;
+        }
+
         setLoading(true);
 
         try {
+            // 0. البريد الإلكتروني أو الواتساب مسجل مسبقاً؟ (Pre-check to avoid scary 500 errors)
+            const { data: existingProfiles, error: checkError } = await supabase
+                .from('profiles')
+                .select('username, whatsapp_number')
+                .or(`username.eq.${regUsername},whatsapp_number.eq.${whatsappNumber}`);
+
+            if (checkError) {
+                console.warn('Pre-check error:', checkError);
+            } else if (existingProfiles && existingProfiles.length > 0) {
+                const hasEmail = existingProfiles.some(p => p.username?.toLowerCase() === regUsername.toLowerCase());
+                const hasWhatsApp = existingProfiles.some(p => p.whatsapp_number === whatsappNumber);
+
+                if (hasEmail) {
+                    setErrorMsg('عذراً، هذا البريد الإلكتروني مسجل مسبقاً.');
+                    setLoading(false);
+                    return;
+                }
+                if (hasWhatsApp) {
+                    setErrorMsg('عذراً، رقم الواتساب هذا مسجل مسبقاً.');
+                    setLoading(false);
+                    return;
+                }
+            }
+
             // 1. Create Auth User
             const { data: authData, error: authError } = await supabase.auth.signUp({
                 email: regUsername,
@@ -193,12 +248,59 @@ const AuthScreen: React.FC = () => {
                 // 2. Setup Tenant Data (Org + Profile) via Secure RPC
                 const { error: rpcError } = await supabase.rpc('complete_signup', {
                     p_org_name: orgName,
-                    p_owner_name: ownerName
+                    p_owner_name: ownerName,
+                    p_whatsapp_number: whatsappNumber // Pass WhatsApp Number
                 });
 
                 if (rpcError) throw rpcError;
 
-                // 3. Navigate (Assuming Auto-Login if email confirm is disabled)
+                // 3. إرسال رسالة ترحيب عبر واتساب (في الخلفية - لا يوقف التسجيل)
+                try {
+                    const whatsappServerUrl = `http://${window.location.hostname}:3002`;
+
+                    // جلب أول جلسة متصلة
+                    const sessionsRes = await fetch(`${whatsappServerUrl}/api/sessions`);
+                    const sessionsData = await sessionsRes.json();
+
+                    if (sessionsData.success && sessionsData.sessions?.length > 0) {
+                        const connectedSession = sessionsData.sessions.find(
+                            (s: { status: string }) => s.status === 'connected'
+                        );
+
+                        if (connectedSession) {
+                            // حساب تاريخ انتهاء الـ 14 يوم
+                            const endDate = new Date();
+                            endDate.setDate(endDate.getDate() + 14);
+                            const endDateStr = endDate.toLocaleDateString('ar-EG');
+
+                            const welcomeMessage = `مرحباً ${ownerName}! 👋
+
+تم تسجيل حسابك بنجاح في MyFleet Enterprise.
+
+📦 باقتك: النسخة التجريبية (14 يوم)
+📆 تاريخ الانتهاء: ${endDateStr}
+
+لمساعدة تواصل معنا على هذا الرقم.`;
+
+                            // إرسال الرسالة
+                            await fetch(`${whatsappServerUrl}/api/messages/send`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    sessionId: connectedSession.id,
+                                    phoneNumber: whatsappNumber.replace(/\D/g, ''), // أرقام فقط
+                                    message: welcomeMessage
+                                })
+                            });
+                            console.log('✅ Welcome WhatsApp message sent successfully');
+                        }
+                    }
+                } catch (whatsappError) {
+                    // لا نوقف التسجيل إذا فشل إرسال الرسالة
+                    console.warn('⚠️ Could not send WhatsApp welcome message:', whatsappError);
+                }
+
+                // 4. Navigate (Assuming Auto-Login if email confirm is disabled)
                 if (authData.session) {
                     navigate('/dashboard');
                 } else {
@@ -208,22 +310,28 @@ const AuthScreen: React.FC = () => {
                 }
             }
 
-        } catch (err: unknown) {
-            console.error(err);
-            let msg = 'حدث خطأ أثناء إنشاء الحساب.';
-            if (err instanceof Error) {
-                msg = err.message;
-            } else if (typeof err === 'object' && err !== null && 'message' in err) {
-                msg = String((err as any).message);
-            }
+        } catch (err: any) {
+            console.error('Registration Error:', err);
+            let msg = 'حدث خطأ غير متوقع أثناء إنشاء الحساب.';
 
-            // Registration Errors
-            if (msg.includes('unique constraint') || msg.includes('already registered')) {
-                msg = 'هذا البريد الإلكتروني مسجل مسبقاً، حاول تسجيل الدخول.';
-            } else if (msg.includes('Password should be')) {
-                msg = 'كلمة المرور ضعيفة جداً.';
-            } else if (msg.includes('valid email')) {
-                msg = 'البريد الإلكتروني غير صالح.';
+            const errorString = err.message || String(err);
+
+            // تحويل الأخطاء التقنية لرسائل مفهومة بالعربية
+            if (errorString.includes('profiles_whatsapp_number_key')) {
+                msg = 'عذراً، رقم الواتساب هذا مسجل مسبقاً بنظامنا.';
+            } else if (errorString.includes('already registered') || errorString.includes('Email already in use') || errorString.includes('profiles_username_key')) {
+                msg = 'هذا البريد الإلكتروني مسجل مسبقاً بالفعل.';
+            } else if (errorString.includes('Password should be at least')) {
+                msg = 'كلمة السر قصيرة جداً (يجب أن تكون 6 أحرف على الأقل).';
+            } else if (errorString.includes('invalid email')) {
+                msg = 'البريد الإلكتروني المدخل غير صحيح.';
+            } else if (errorString.includes('rate limit')) {
+                msg = 'تم إرسال محاولات كثيرة جداً، يرجى الانتظار قليلاً.';
+            } else if (errorString.includes('Database error saving new user') || errorString.includes('500')) {
+                // رسالة عامة للمدير/المستخدم بدلاً من الرسالة التقنية المرعبة
+                msg = 'حدث خطأ أثناء حفظ البيانات، يرجى التأكد من أن الإيميل أو رقم الواتساب لم يتم استخدامهما من قبل.';
+            } else {
+                msg = errorString;
             }
 
             setErrorMsg(msg);
@@ -296,8 +404,37 @@ const AuthScreen: React.FC = () => {
                                 <label htmlFor="login-password" className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5 block">كلمة المرور</label>
                                 <div className="relative group">
                                     <Key className="absolute right-3.5 top-3.5 text-slate-400 dark:text-slate-500 group-focus-within:text-blue-500 transition w-5 h-5" />
-                                    <input id="login-password" type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-600 rounded-xl p-3.5 pr-11 text-slate-900 dark:text-white outline-none focus:border-blue-500 transition shadow-inner" placeholder="••••••••" />
+                                    <input 
+                                        id="login-password" 
+                                        type={showLoginPassword ? "text" : "password"}
+                                        required 
+                                        value={password} 
+                                        onChange={e => setPassword(e.target.value)} 
+                                        className="w-full bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-600 rounded-xl p-3.5 pr-11 text-slate-900 dark:text-white outline-none focus:border-blue-500 transition shadow-inner" 
+                                        placeholder="••••••" 
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowLoginPassword(!showLoginPassword)}
+                                        className="absolute right-3.5 top-3.5 text-slate-400 dark:text-slate-500 group-focus-within:text-blue-500 transition w-5 h-5"
+                                    >
+                                        {showLoginPassword ? <EyeOff /> : <Eye />}
+                                    </button>
                                 </div>
+                            </div>
+
+                            {/* ✨ NEW: Remember Me Checkbox */}
+                            <div className="flex items-center gap-2">
+                                <input 
+                                    type="checkbox" 
+                                    id="remember-me"
+                                    checked={rememberMe}
+                                    onChange={e => setRememberMe(e.target.checked)}
+                                    className="w-4 h-4 rounded border-gray-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                />
+                                <label htmlFor="remember-me" className="text-sm text-slate-600 dark:text-slate-400 select-none cursor-pointer">
+                                    تذكيري (حفظ بيانات الدخول لمدة 30 يوم)
+                                </label>
                             </div>
 
                             <button disabled={loading} className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl font-bold text-white flex items-center justify-center gap-2 shadow-xl shadow-blue-900/30 transition transform active:scale-[0.98]">
@@ -305,10 +442,21 @@ const AuthScreen: React.FC = () => {
                                 دخول آمن
                             </button>
 
+                            {/* ✨ NEW: Forgot Password Link */}
+                            <div className="text-center pt-2">
+                                <button 
+                                    type="button" 
+                                    className="text-xs text-slate-500 hover:text-blue-500 transition font-medium underline"
+                                    onClick={() => navigate('/forgot-password')}
+                                >
+                                    هل نسيت كلمة المرور؟
+                                </button>
+                            </div>
+
                             {config?.show_landing_page && (
                                 <div className="text-center pt-2">
                                     <button type="button" onClick={() => navigate('/landing')} className="text-xs text-slate-500 hover:text-white transition flex items-center justify-center gap-1 mx-auto">
-                                        العودة للصفحة الرئيسية <ArrowRight className="w-3 h-3" />
+                                        العودة للصفحة الرئيسية <ArrowRightIcon className="w-3 h-3" />
                                     </button>
                                 </div>
                             )}
@@ -338,10 +486,44 @@ const AuthScreen: React.FC = () => {
                             </div>
                             <div>
                                 <label htmlFor="reg-password" className="text-xs font-bold text-slate-400 mb-1 block">كلمة المرور</label>
-                                <div className="relative">
+                                <div className="relative group">
                                     <Key className="absolute right-3 top-3 text-slate-500 w-5 h-5" />
-                                    <input id="reg-password" required type="password" value={regPassword} onChange={e => setRegPassword(e.target.value)} className="w-full bg-[#0f172a] border border-slate-600 rounded-xl p-3 pr-10 text-white outline-none focus:border-blue-500" placeholder="••••••••" />
+                                    <input 
+                                        id="reg-password" 
+                                        type={showRegisterPassword ? "text" : "password"}
+                                        required 
+                                        value={regPassword} 
+                                        onChange={e => setRegPassword(e.target.value)} 
+                                        className="w-full bg-[#0f172a] border border-slate-600 rounded-xl p-3 pr-10 text-white outline-none focus:border-blue-500 placeholder:text-slate-600"
+                                        placeholder="••••••" 
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                                        className="absolute right-3 top-3 text-slate-500 group-focus-within:text-blue-500 transition w-5 h-5"
+                                    >
+                                        {showRegisterPassword ? <EyeOff /> : <Eye />}
+                                    </button>
                                 </div>
+                            </div>
+
+                            <div className="bg-blue-900/20 p-4 rounded-xl border border-blue-500/30">
+                                <label htmlFor="reg-whatsapp" className="text-xs font-bold text-blue-400 mb-1 block">رقم الواتساب (إجباري)</label>
+                                <div className="relative mb-2">
+                                    <div className="absolute right-3 top-3 text-slate-500 w-5 h-5">📱</div>
+                                    <input
+                                        id="reg-whatsapp"
+                                        required
+                                        value={whatsappNumber}
+                                        onChange={e => setWhatsappNumber(e.target.value)}
+                                        className="w-full bg-[#0f172a] border border-blue-500/50 rounded-xl p-3 pr-10 text-white outline-none focus:border-blue-400 placeholder:text-slate-600"
+                                        placeholder="مثال: 01000000000"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-blue-300 flex items-start gap-1">
+                                    <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
+                                    سيتم ربط هذا الرقم بحسابك لإرسال تنبيهات الاشتراك وتفاصيل الباقة. لا يمكن تغيير الرقم لاحقاً بسهولة.
+                                </p>
                             </div>
 
                             <button disabled={loading} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-white flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 transition mt-2">

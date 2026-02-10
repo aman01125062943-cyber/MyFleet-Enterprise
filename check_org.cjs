@@ -1,0 +1,9 @@
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
+
+const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
+
+(async () => {
+  const { data } = await supabase.from('organizations').select('*').eq('id', 'f6eec079-afd1-4d30-aad7-2e75f3b48785').single();
+  console.log(JSON.stringify(data, null, 2));
+})();

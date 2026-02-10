@@ -10,3 +10,18 @@ services:
         sync: false
       - key: VITE_SUPABASE_ANON_KEY
         sync: false
+  - type: web
+    name: myfleet-whatsapp
+    env: docker
+    region: frankfurt
+    plan: free
+    branch: main
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: PORT
+        value: 3002
+      - key: NODE_ENV
+        value: production

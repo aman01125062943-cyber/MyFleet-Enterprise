@@ -7,8 +7,9 @@ import { Profile, UserPermissions } from '../types';
 import { LayoutContextType } from './Layout';
 import { useToast } from './ToastProvider';
 import {
-    UserPlus, Search, Shield, Loader2, Lock, Trash2, X, AlertCircle
+    UserPlus, Search, Shield, Loader2, Lock, Trash2, X, AlertCircle, Crown
 } from 'lucide-react';
+import { PLAN_MAX_PERMISSIONS, PLAN_NAMES_AR, getDefaultPermissionsForPlan } from '../lib/planPermissionGuard';
 
 // Default empty permissions structure
 const defaultPermissions: UserPermissions = {
@@ -17,7 +18,16 @@ const defaultPermissions: UserPermissions = {
     finance: { view: false, add_income: false, add_expense: false, export: false },
     assets: { view: false, add: false, edit: false, delete: false },
     team: { view: false, manage: false },
-    reports: { view: false }
+    reports: { view: false },
+    subscription: {
+        view_requests: false,
+        approve_requests: false,
+        reject_requests: false,
+        manage_plans: false,
+        manage_discounts: false,
+        view_reports: false,
+        manage_notifications: false
+    }
 };
 
 interface TemplatePerms {
@@ -34,7 +44,16 @@ const templates: Record<string, TemplatePerms> = {
             finance: { view: true, add_income: true, add_expense: true, export: true },
             assets: { view: true, add: true, edit: true, delete: true },
             team: { view: true, manage: true },
-            reports: { view: true }
+            reports: { view: true },
+            subscription: {
+                view_requests: true,
+                approve_requests: true,
+                reject_requests: true,
+                manage_plans: false,
+                manage_discounts: false,
+                view_reports: true,
+                manage_notifications: false
+            }
         }
     },
     supervisor: {
@@ -45,7 +64,16 @@ const templates: Record<string, TemplatePerms> = {
             finance: { view: true, add_income: true, add_expense: true, export: false },
             assets: { view: true, add: true, edit: true, delete: false },
             team: { view: true, manage: false },
-            reports: { view: true }
+            reports: { view: true },
+            subscription: {
+                view_requests: false,
+                approve_requests: false,
+                reject_requests: false,
+                manage_plans: false,
+                manage_discounts: false,
+                view_reports: false,
+                manage_notifications: false
+            }
         }
     },
     staff: {
@@ -56,7 +84,37 @@ const templates: Record<string, TemplatePerms> = {
             finance: { view: false, add_income: false, add_expense: false, export: false },
             assets: { view: false, add: false, edit: false, delete: false },
             team: { view: false, manage: false },
-            reports: { view: false }
+            reports: { view: false },
+            subscription: {
+                view_requests: false,
+                approve_requests: false,
+                reject_requests: false,
+                manage_plans: false,
+                manage_discounts: false,
+                view_reports: false,
+                manage_notifications: false
+            }
+        }
+    },
+    // قالب جديد لمدير الاشتراكات
+    subscription_manager: {
+        label: 'مدير الاشتراكات',
+        perms: {
+            dashboard: { view: false },
+            inventory: { view: false, add: false, edit: false, delete: false, manage_status: false },
+            finance: { view: true, add_income: false, add_expense: false, export: true },
+            assets: { view: false, add: false, edit: false, delete: false },
+            team: { view: true, manage: false },
+            reports: { view: true },
+            subscription: {
+                view_requests: true,
+                approve_requests: true,
+                reject_requests: true,
+                manage_plans: false,
+                manage_discounts: true,
+                view_reports: true,
+                manage_notifications: true
+            }
         }
     }
 };
@@ -90,6 +148,7 @@ const Team: React.FC = () => {
         email: '',
         password: '',
         role: 'staff',
+        subscription_plan: org?.subscription_plan || 'starter',
         permissions: defaultPermissions
     });
 
@@ -117,6 +176,19 @@ const Team: React.FC = () => {
         }
     };
 
+    // تحديث الصلاحيات عند تغيير الباقة
+    const handlePlanChange = (planId: string) => {
+        setFormData(prev => ({
+            ...prev,
+            subscription_plan: planId,
+            // الصلاحيات تأتي تلقائياً من الباقة
+            permissions: getDefaultPermissionsForPlan(planId)
+        }));
+    };
+
+    // الحصول على الصلاحيات القصوى للباقة المحددة
+    const maxPermissionsForCurrentPlan = PLAN_MAX_PERMISSIONS[formData.subscription_plan as keyof typeof PLAN_MAX_PERMISSIONS] || PLAN_MAX_PERMISSIONS.starter;
+
     const handleOpenCreate = () => {
         // SECURITY GUARD: Read Only
         if (isReadOnly) return;
@@ -128,10 +200,15 @@ const Team: React.FC = () => {
             return;
         }
 
+        const defaultPlan = org?.subscription_plan || 'starter';
         setEditMode(false);
         setFormData({
-            full_name: '', email: '', password: '', role: 'staff',
-            permissions: templates.staff.perms as UserPermissions
+            full_name: '',
+            email: '',
+            password: '',
+            role: 'staff',
+            subscription_plan: defaultPlan,
+            permissions: getDefaultPermissionsForPlan(defaultPlan)
         });
         setIsModalOpen(true);
     };
@@ -142,12 +219,14 @@ const Team: React.FC = () => {
 
         setEditMode(true);
         setSelectedUser(targetUser);
+        const userPlan = org?.subscription_plan || 'starter';
         setFormData({
             full_name: targetUser.full_name,
             email: targetUser.username, // Fallback mapping for edit
             password: '',
             role: targetUser.role || 'staff',
-            permissions: targetUser.permissions || defaultPermissions
+            subscription_plan: userPlan,
+            permissions: targetUser.permissions || getDefaultPermissionsForPlan(userPlan)
         });
         setIsModalOpen(true);
     };
@@ -238,9 +317,14 @@ const Team: React.FC = () => {
 
         try {
             // @ts-expect-error: import.meta might not be available
-            const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://necqtqhmnmcsjxcxgeff.supabase.co';
+            const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
             // @ts-expect-error: import.meta might not be available
-            const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5lY3F0cWhtbm1jc2p4Y3hnZWZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzODg1NTUsImV4cCI6MjA4NDk2NDU1NX0.vpSOLJbEN1JrASDLiZ1G6-yT_QUZo0JzEDKefKANAaQ';
+            const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+            // SECURITY: Validate credentials exist - no hardcoded fallbacks
+            if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+                throw new Error('Missing Supabase configuration. Please contact system administrator.');
+            }
 
             const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
 
@@ -323,13 +407,25 @@ const Team: React.FC = () => {
     const togglePerm = (category: keyof UserPermissions, key: string) => {
         if (isReadOnly) return;
 
+        const currentValue = (formData.permissions[category] as any)?.[key] || false;
+        const newValue = !currentValue;
+
+        // إذا كان المحاولة تفعيل صلاحية، تأكد أنها مسموحة في الباقة
+        if (newValue === true) {
+            const allowedInPlan = maxPermissionsForCurrentPlan[category]?.[key] === true;
+            if (!allowedInPlan) {
+                // الصلاحية غير مسموحة في الباقة - لا تسمح بالتفعيل
+                return;
+            }
+        }
+
         setFormData(prev => ({
             ...prev,
             permissions: {
                 ...prev.permissions,
                 [category]: {
                     ...prev.permissions[category],
-                    [key]: !(prev.permissions[category] as any)[key]
+                    [key]: newValue
                 }
             }
         }));
@@ -482,93 +578,255 @@ const Team: React.FC = () => {
                                 )}
                             </div>
 
+                            {/* Plan Selector - NEW */}
+                            <div className="md:col-span-3">
+                                <label className="text-xs font-bold text-slate-500 mb-2 block flex items-center gap-2">
+                                    <Crown className="w-4 h-4 text-amber-500" />
+                                    باقة الصلاحيات
+                                </label>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    {Object.keys(PLAN_MAX_PERMISSIONS).map(planId => {
+                                        const isSelected = formData.subscription_plan === planId;
+                                        const planName = PLAN_NAMES_AR[planId as keyof typeof PLAN_NAMES_AR] || planId;
+                                        return (
+                                            <button
+                                                key={planId}
+                                                type="button"
+                                                onClick={() => handlePlanChange(planId)}
+                                                className={`p-4 rounded-xl border-2 transition-all text-center ${
+                                                    isSelected
+                                                        ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/20'
+                                                        : 'border-gray-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 bg-slate-50 dark:bg-[#1e293b]'
+                                                }`}
+                                            >
+                                                <div className={`font-bold text-sm mb-1 ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                                                    {planName}
+                                                </div>
+                                                {isSelected && (
+                                                    <div className="text-xs text-blue-500 dark:text-blue-400">
+                                                        ✓ الباقة الحالية
+                                                    </div>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <p className="text-xs text-slate-500 mt-2">
+                                    💡 الصلاحيات تُحدد تلقائياً حسب الباقة المختارة. يمكنك تقليل الصلاحيات لكن لا يمكنك زيادتها عن حدود الباقة.
+                                </p>
+                            </div>
+
                             <div>
                                 <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
                                     <Shield className="w-4 h-4 text-blue-500" /> مصفوفة الصلاحيات
+                                    <span className="text-xs font-normal text-slate-500">(الباقة: {PLAN_NAMES_AR[formData.subscription_plan as keyof typeof PLAN_NAMES_AR] || formData.subscription_plan})</span>
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {/* Inventory */}
-                                    <div className="bg-slate-50 dark:bg-[#1e293b] p-4 rounded-xl border border-gray-200 dark:border-slate-700">
-                                        <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2">🚗 إدارة الأسطول</div>
+                                    <div className={`bg-slate-50 dark:bg-[#1e293b] p-4 rounded-xl border ${maxPermissionsForCurrentPlan.inventory?.view ? 'border-gray-200 dark:border-slate-700' : 'border-amber-200 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/10'}`}>
+                                        <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2 flex items-center justify-between">
+                                            <span>🚗 إدارة الأسطول</span>
+                                            {!maxPermissionsForCurrentPlan.inventory?.view && (
+                                                <Lock className="w-4 h-4 text-amber-500" title="غير متاح في هذه الباقة" />
+                                            )}
+                                        </div>
                                         <div className="space-y-3">
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={formData.permissions.inventory.view} onChange={() => togglePerm('inventory', 'view')} className="w-4 h-4 accent-blue-600 rounded" />
+                                            <label className={`flex items-center gap-3 ${maxPermissionsForCurrentPlan.inventory?.view ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+                                                <div className="relative">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formData.permissions.inventory.view}
+                                                        onChange={() => togglePerm('inventory', 'view')}
+                                                        disabled={!maxPermissionsForCurrentPlan.inventory?.view}
+                                                        className="w-4 h-4 accent-blue-600 rounded"
+                                                    />
+                                                    {!maxPermissionsForCurrentPlan.inventory?.view && (
+                                                        <Lock className="absolute -top-1 -right-1 w-3 h-3 bg-slate-700 rounded-full p-0.5 text-slate-300" />
+                                                    )}
+                                                </div>
                                                 <span className="text-sm text-slate-600 dark:text-slate-400">عرض السيارات</span>
                                             </label>
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={formData.permissions.inventory.add} onChange={() => togglePerm('inventory', 'add')} className="w-4 h-4 accent-blue-600 rounded" />
+                                            <label className={`flex items-center gap-3 ${maxPermissionsForCurrentPlan.inventory?.add ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+                                                <div className="relative">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formData.permissions.inventory.add}
+                                                        onChange={() => togglePerm('inventory', 'add')}
+                                                        disabled={!maxPermissionsForCurrentPlan.inventory?.add}
+                                                        className="w-4 h-4 accent-blue-600 rounded"
+                                                    />
+                                                    {!maxPermissionsForCurrentPlan.inventory?.add && (
+                                                        <Lock className="absolute -top-1 -right-1 w-3 h-3 bg-slate-700 rounded-full p-0.5 text-slate-300" />
+                                                    )}
+                                                </div>
                                                 <span className="text-sm text-slate-600 dark:text-slate-400">إضافة سيارات</span>
                                             </label>
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={formData.permissions.inventory.manage_status} onChange={() => togglePerm('inventory', 'manage_status')} className="w-4 h-4 accent-blue-600 rounded" />
+                                            <label className={`flex items-center gap-3 ${maxPermissionsForCurrentPlan.inventory?.manage_status ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+                                                <div className="relative">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formData.permissions.inventory.manage_status}
+                                                        onChange={() => togglePerm('inventory', 'manage_status')}
+                                                        disabled={!maxPermissionsForCurrentPlan.inventory?.manage_status}
+                                                        className="w-4 h-4 accent-blue-600 rounded"
+                                                    />
+                                                    {!maxPermissionsForCurrentPlan.inventory?.manage_status && (
+                                                        <Lock className="absolute -top-1 -right-1 w-3 h-3 bg-slate-700 rounded-full p-0.5 text-slate-300" />
+                                                    )}
+                                                </div>
                                                 <span className="text-sm text-slate-600 dark:text-slate-400">تغيير الحالة</span>
                                             </label>
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={formData.permissions.inventory.delete} onChange={() => togglePerm('inventory', 'delete')} className="w-4 h-4 accent-red-600 rounded" />
+                                            <label className={`flex items-center gap-3 ${maxPermissionsForCurrentPlan.inventory?.delete ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+                                                <div className="relative">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formData.permissions.inventory.delete}
+                                                        onChange={() => togglePerm('inventory', 'delete')}
+                                                        disabled={!maxPermissionsForCurrentPlan.inventory?.delete}
+                                                        className="w-4 h-4 accent-red-600 rounded"
+                                                    />
+                                                    {!maxPermissionsForCurrentPlan.inventory?.delete && (
+                                                        <Lock className="absolute -top-1 -right-1 w-3 h-3 bg-slate-700 rounded-full p-0.5 text-slate-300" />
+                                                    )}
+                                                </div>
                                                 <span className="text-sm text-red-500">حذف سيارات (خطر)</span>
                                             </label>
                                         </div>
                                     </div>
                                     {/* Finance */}
-                                    <div className="bg-slate-50 dark:bg-[#1e293b] p-4 rounded-xl border border-gray-200 dark:border-slate-700">
-                                        <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2">💰 المالية</div>
+                                    <div className={`bg-slate-50 dark:bg-[#1e293b] p-4 rounded-xl border ${maxPermissionsForCurrentPlan.finance?.view ? 'border-gray-200 dark:border-slate-700' : 'border-amber-200 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/10'}`}>
+                                        <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2 flex items-center justify-between">
+                                            <span>💰 المالية</span>
+                                            {!maxPermissionsForCurrentPlan.finance?.view && (
+                                                <Lock className="w-4 h-4 text-amber-500" title="غير متاح في هذه الباقة" />
+                                            )}
+                                        </div>
                                         <div className="space-y-3">
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={formData.permissions.finance.view} onChange={() => togglePerm('finance', 'view')} className="w-4 h-4 accent-blue-600 rounded" />
+                                            <label className={`flex items-center gap-3 ${maxPermissionsForCurrentPlan.finance?.view ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+                                                <div className="relative">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formData.permissions.finance.view}
+                                                        onChange={() => togglePerm('finance', 'view')}
+                                                        disabled={!maxPermissionsForCurrentPlan.finance?.view}
+                                                        className="w-4 h-4 accent-blue-600 rounded"
+                                                    />
+                                                    {!maxPermissionsForCurrentPlan.finance?.view && (
+                                                        <Lock className="absolute -top-1 -right-1 w-3 h-3 bg-slate-700 rounded-full p-0.5 text-slate-300" />
+                                                    )}
+                                                </div>
                                                 <span className="text-sm text-slate-600 dark:text-slate-400">الاطلاع على المالية</span>
                                             </label>
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={formData.permissions.finance.add_income} onChange={() => togglePerm('finance', 'add_income')} className="w-4 h-4 accent-blue-600 rounded" />
+                                            <label className={`flex items-center gap-3 ${maxPermissionsForCurrentPlan.finance?.add_income ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+                                                <div className="relative">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formData.permissions.finance.add_income}
+                                                        onChange={() => togglePerm('finance', 'add_income')}
+                                                        disabled={!maxPermissionsForCurrentPlan.finance?.add_income}
+                                                        className="w-4 h-4 accent-blue-600 rounded"
+                                                    />
+                                                    {!maxPermissionsForCurrentPlan.finance?.add_income && (
+                                                        <Lock className="absolute -top-1 -right-1 w-3 h-3 bg-slate-700 rounded-full p-0.5 text-slate-300" />
+                                                    )}
+                                                </div>
                                                 <span className="text-sm text-slate-600 dark:text-slate-400">تسجيل إيرادات</span>
                                             </label>
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={formData.permissions.finance.add_expense} onChange={() => togglePerm('finance', 'add_expense')} className="w-4 h-4 accent-blue-600 rounded" />
+                                            <label className={`flex items-center gap-3 ${maxPermissionsForCurrentPlan.finance?.add_expense ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+                                                <div className="relative">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formData.permissions.finance.add_expense}
+                                                        onChange={() => togglePerm('finance', 'add_expense')}
+                                                        disabled={!maxPermissionsForCurrentPlan.finance?.add_expense}
+                                                        className="w-4 h-4 accent-blue-600 rounded"
+                                                    />
+                                                    {!maxPermissionsForCurrentPlan.finance?.add_expense && (
+                                                        <Lock className="absolute -top-1 -right-1 w-3 h-3 bg-slate-700 rounded-full p-0.5 text-slate-300" />
+                                                    )}
+                                                </div>
                                                 <span className="text-sm text-slate-600 dark:text-slate-400">تسجيل مصروفات</span>
                                             </label>
                                         </div>
                                     </div>
                                     {/* Assets */}
-                                    <div className="bg-slate-50 dark:bg-[#1e293b] p-4 rounded-xl border border-gray-200 dark:border-slate-700">
-                                        <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2">🏗️ الأصول</div>
+                                    <div className={`bg-slate-50 dark:bg-[#1e293b] p-4 rounded-xl border ${maxPermissionsForCurrentPlan.assets?.view ? 'border-gray-200 dark:border-slate-700' : 'border-amber-200 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/10'}`}>
+                                        <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2 flex items-center justify-between">
+                                            <span>🏗️ الأصول</span>
+                                            {!maxPermissionsForCurrentPlan.assets?.view && (
+                                                <Lock className="w-4 h-4 text-amber-500" title="غير متاح في هذه الباقة" />
+                                            )}
+                                        </div>
                                         <div className="space-y-3">
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={formData.permissions.assets.view} onChange={() => togglePerm('assets', 'view')} className="w-4 h-4 accent-blue-600 rounded" />
+                                            <label className={`flex items-center gap-3 ${maxPermissionsForCurrentPlan.assets?.view ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+                                                <div className="relative">
+                                                    <input type="checkbox" checked={formData.permissions.assets.view} onChange={() => togglePerm('assets', 'view')} disabled={!maxPermissionsForCurrentPlan.assets?.view} className="w-4 h-4 accent-blue-600 rounded" />
+                                                    {!maxPermissionsForCurrentPlan.assets?.view && <Lock className="absolute -top-1 -right-1 w-3 h-3 bg-slate-700 rounded-full p-0.5 text-slate-300" />}
+                                                </div>
                                                 <span className="text-sm text-slate-600 dark:text-slate-400">عرض الأصول</span>
                                             </label>
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={formData.permissions.assets.add} onChange={() => togglePerm('assets', 'add')} className="w-4 h-4 accent-blue-600 rounded" />
+                                            <label className={`flex items-center gap-3 ${maxPermissionsForCurrentPlan.assets?.add ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+                                                <div className="relative">
+                                                    <input type="checkbox" checked={formData.permissions.assets.add} onChange={() => togglePerm('assets', 'add')} disabled={!maxPermissionsForCurrentPlan.assets?.add} className="w-4 h-4 accent-blue-600 rounded" />
+                                                    {!maxPermissionsForCurrentPlan.assets?.add && <Lock className="absolute -top-1 -right-1 w-3 h-3 bg-slate-700 rounded-full p-0.5 text-slate-300" />}
+                                                </div>
                                                 <span className="text-sm text-slate-600 dark:text-slate-400">إضافة أصول</span>
                                             </label>
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={formData.permissions.assets.edit} onChange={() => togglePerm('assets', 'edit')} className="w-4 h-4 accent-blue-600 rounded" />
+                                            <label className={`flex items-center gap-3 ${maxPermissionsForCurrentPlan.assets?.edit ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+                                                <div className="relative">
+                                                    <input type="checkbox" checked={formData.permissions.assets.edit} onChange={() => togglePerm('assets', 'edit')} disabled={!maxPermissionsForCurrentPlan.assets?.edit} className="w-4 h-4 accent-blue-600 rounded" />
+                                                    {!maxPermissionsForCurrentPlan.assets?.edit && <Lock className="absolute -top-1 -right-1 w-3 h-3 bg-slate-700 rounded-full p-0.5 text-slate-300" />}
+                                                </div>
                                                 <span className="text-sm text-slate-600 dark:text-slate-400">تعديل الأصول</span>
                                             </label>
                                         </div>
                                     </div>
                                     {/* Team */}
-                                    <div className="bg-slate-50 dark:bg-[#1e293b] p-4 rounded-xl border border-gray-200 dark:border-slate-700">
-                                        <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2">👥 الإدارة</div>
+                                    <div className={`bg-slate-50 dark:bg-[#1e293b] p-4 rounded-xl border ${maxPermissionsForCurrentPlan.team?.view ? 'border-gray-200 dark:border-slate-700' : 'border-amber-200 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/10'}`}>
+                                        <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2 flex items-center justify-between">
+                                            <span>👥 الإدارة</span>
+                                            {!maxPermissionsForCurrentPlan.team?.view && (
+                                                <Lock className="w-4 h-4 text-amber-500" title="غير متاح في هذه الباقة" />
+                                            )}
+                                        </div>
                                         <div className="space-y-3">
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={formData.permissions.team.view} onChange={() => togglePerm('team', 'view')} className="w-4 h-4 accent-blue-600 rounded" />
+                                            <label className={`flex items-center gap-3 ${maxPermissionsForCurrentPlan.team?.view ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+                                                <div className="relative">
+                                                    <input type="checkbox" checked={formData.permissions.team.view} onChange={() => togglePerm('team', 'view')} disabled={!maxPermissionsForCurrentPlan.team?.view} className="w-4 h-4 accent-blue-600 rounded" />
+                                                    {!maxPermissionsForCurrentPlan.team?.view && <Lock className="absolute -top-1 -right-1 w-3 h-3 bg-slate-700 rounded-full p-0.5 text-slate-300" />}
+                                                </div>
                                                 <span className="text-sm text-slate-600 dark:text-slate-400">عرض الفريق</span>
                                             </label>
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={formData.permissions.team.manage} onChange={() => togglePerm('team', 'manage')} className="w-4 h-4 accent-blue-600 rounded" />
+                                            <label className={`flex items-center gap-3 ${maxPermissionsForCurrentPlan.team?.manage ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+                                                <div className="relative">
+                                                    <input type="checkbox" checked={formData.permissions.team.manage} onChange={() => togglePerm('team', 'manage')} disabled={!maxPermissionsForCurrentPlan.team?.manage} className="w-4 h-4 accent-blue-600 rounded" />
+                                                    {!maxPermissionsForCurrentPlan.team?.manage && <Lock className="absolute -top-1 -right-1 w-3 h-3 bg-slate-700 rounded-full p-0.5 text-slate-300" />}
+                                                </div>
                                                 <span className="text-sm text-slate-600 dark:text-slate-400">إدارة المستخدمين</span>
                                             </label>
                                         </div>
                                     </div>
                                     {/* Reports */}
-                                    <div className="bg-slate-50 dark:bg-[#1e293b] p-4 rounded-xl border border-gray-200 dark:border-slate-700">
-                                        <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2">📊 التقارير</div>
+                                    <div className={`bg-slate-50 dark:bg-[#1e293b] p-4 rounded-xl border ${maxPermissionsForCurrentPlan.reports?.view ? 'border-gray-200 dark:border-slate-700' : 'border-amber-200 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/10'}`}>
+                                        <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2 flex items-center justify-between">
+                                            <span>📊 التقارير</span>
+                                            {!maxPermissionsForCurrentPlan.reports?.view && (
+                                                <Lock className="w-4 h-4 text-amber-500" title="غير متاح في هذه الباقة" />
+                                            )}
+                                        </div>
                                         <div className="space-y-3">
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={formData.permissions.dashboard.view} onChange={() => togglePerm('dashboard', 'view')} className="w-4 h-4 accent-blue-600 rounded" />
+                                            <label className={`flex items-center gap-3 ${maxPermissionsForCurrentPlan.dashboard?.view ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+                                                <div className="relative">
+                                                    <input type="checkbox" checked={formData.permissions.dashboard.view} onChange={() => togglePerm('dashboard', 'view')} disabled={!maxPermissionsForCurrentPlan.dashboard?.view} className="w-4 h-4 accent-blue-600 rounded" />
+                                                    {!maxPermissionsForCurrentPlan.dashboard?.view && <Lock className="absolute -top-1 -right-1 w-3 h-3 bg-slate-700 rounded-full p-0.5 text-slate-300" />}
+                                                </div>
                                                 <span className="text-sm text-slate-600 dark:text-slate-400">لوحة القيادة (Dashboard)</span>
                                             </label>
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={formData.permissions.reports.view} onChange={() => togglePerm('reports', 'view')} className="w-4 h-4 accent-blue-600 rounded" />
+                                            <label className={`flex items-center gap-3 ${maxPermissionsForCurrentPlan.reports?.view ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+                                                <div className="relative">
+                                                    <input type="checkbox" checked={formData.permissions.reports.view} onChange={() => togglePerm('reports', 'view')} disabled={!maxPermissionsForCurrentPlan.reports?.view} className="w-4 h-4 accent-blue-600 rounded" />
+                                                    {!maxPermissionsForCurrentPlan.reports?.view && <Lock className="absolute -top-1 -right-1 w-3 h-3 bg-slate-700 rounded-full p-0.5 text-slate-300" />}
+                                                </div>
                                                 <span className="text-sm text-slate-600 dark:text-slate-400">عرض التقارير التفصيلية</span>
                                             </label>
                                         </div>

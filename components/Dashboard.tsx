@@ -7,7 +7,7 @@ import { LayoutContextType } from './Layout';
 import { db } from '../lib/db';
 import {
     Activity,
-    Calendar, AlertTriangle, BarChart3, ArrowRight, Crown
+    Calendar, AlertTriangle, BarChart3, Crown
 } from 'lucide-react';
 import WelcomeModal from './WelcomeModal';
 
@@ -153,21 +153,6 @@ const Dashboard: React.FC = () => {
         return <div className="p-8 text-center text-slate-500">جاري تحميل البيانات...</div>;
     }
 
-    if (user?.role === 'super_admin') {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 p-8 bg-white dark:bg-[#1e293b] rounded-3xl shadow-sm border border-gray-100 dark:border-slate-700 animate-in fade-in slide-in-from-bottom-4">
-                <div className="w-20 h-20 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-2">
-                    <Activity className="w-10 h-10" />
-                </div>
-                <h1 className="text-3xl font-bold text-slate-800 dark:text-white">أهلاً بك، المالك العام</h1>
-                <p className="text-slate-500 max-w-md text-lg">أنت تستخدم حساب الإدارة العليا للنظام. هذه الصفحة مخصصة لعرض إحصائيات الوكالات.</p>
-                <Link to="/admin" className="mt-6 bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-2xl font-bold flex items-center gap-2 transition hover:scale-105 shadow-xl shadow-indigo-500/30">
-                    الانتقال للوحة الإدارة العليا <ArrowRight className="w-5 h-5" />
-                </Link>
-            </div>
-        )
-    }
-
     const monthlyNet = stats.monthlyIncome - stats.monthlyExpense;
     const weeklyNet = stats.weeklyIncome - stats.weeklyExpense;
 
@@ -180,10 +165,18 @@ const Dashboard: React.FC = () => {
 
             {/* Header & Subscription Status */}
             <div className="flex flex-col md:flex-row justify-between items-end gap-4 mb-6">
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-1">
-                        <Activity className="text-blue-500 w-8 h-8" /> نظرة عامة
-                    </h1>
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <h1 className="text-2xl md:text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-1">
+                            <Activity className="text-blue-500 w-8 h-8" /> نظرة عامة
+                        </h1>
+                        {/* Super Admin Dashboard Button - Only for super_admin */}
+                        {user?.role === 'super_admin' && (
+                            <Link to="/admin" className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm px-4 py-2 rounded-xl transition-all hover:scale-105 shadow-lg shadow-purple-500/30 border border-purple-400/30">
+                                <Crown className="w-4 h-4" /> لوحة الإدارة الشاملة
+                            </Link>
+                        )}
+                    </div>
                     <p className="text-slate-500 text-sm">ملخص الأداء المالي والتشغيلي للوكالة</p>
                 </div>
 

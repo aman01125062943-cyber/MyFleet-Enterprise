@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 /**
  * Health Monitor Service
  * @description Background service that monitors system health and logs incidents
@@ -53,7 +54,7 @@ export interface HealthSummary {
 
 // Configuration
 const HEALTH_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
-const WHATSAPP_SERVER_URL = import.meta.env.VITE_WHATSAPP_SERVER_URL || 'http://localhost:3001';
+const WHATSAPP_SERVER_URL = import.meta.env.VITE_WHATSAPP_SERVER_URL || 'http://localhost:3002';
 
 let monitoringInterval: ReturnType<typeof setInterval> | null = null;
 let isMonitoring = false;
@@ -176,7 +177,7 @@ export async function checkSystemHealth(): Promise<HealthCheckResult | null> {
  */
 async function checkWhatsAppHealth(): Promise<void> {
   try {
-    const response = await fetch(`${WHATSAPP_SERVER_URL}/api/health`);
+    const response = await fetch(`${WHATSAPP_SERVER_URL}/health`);
 
     if (!response.ok) {
       if (response.status >= 500) {
@@ -229,7 +230,7 @@ async function checkSubscriptionHealth(): Promise<void> {
       .select('id, name, created_at')
       .eq('subscription_plan', 'trial')
       .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-      .eq('status', 'active')
+      .eq('is_active', true)
       .limit(10);
 
     if (!error && failedSubscriptions && failedSubscriptions.length > 3) {

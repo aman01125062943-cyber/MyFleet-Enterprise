@@ -316,7 +316,7 @@ w-full flex items-center gap-3 px-3 lg:px-4 py-3 lg:py-3.5 rounded-xl transition
                             {activeSection === 'announcements' && <AnnouncementsSection />}
                             {activeSection === 'plans' && <PlansSection />}
                             {activeSection === 'discounts' && <DiscountCodesSection />}
-                            {activeSection === 'payments' && <PaymentRequestsSection />}
+                            {activeSection === 'payments' && <PaymentRequestsSection currentUser={currentUser} />}
                             {activeSection === 'whatsapp' && <WhatsAppSection />}
                             {activeSection === 'health' && <HealthMonitorSection />}
                             {activeSection === 'logs' && <AuditLogsSection />}
@@ -437,12 +437,34 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({ stats, loading }) => 
     );
 };
 
+// ==================== HELPER FUNCTIONS ====================
+
+/**
+ * Generate a secure random secret key for an organization
+ * @param orgId - Organization ID
+ * @returns Secure secret key in format: sk_live_{orgPart}_{randomPart}
+ */
+const generateSecretKey = (orgId: string): string => {
+  // Remove dashes and take first 12 characters of org ID
+  const orgPart = orgId.replaceAll('-', '').substring(0, 12);
+
+  // Generate 16 random bytes (32 hex characters) for the secret part
+  const randomPart = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+
+  return `sk_live_${orgPart}_${randomPart}`;
+};
+
 // ==================== ORGANIZATIONS SECTION ====================
 
 const OrganizationsSection: React.FC<{ initialOrgs: Organization[]; onRefresh: () => void }> = ({ initialOrgs, onRefresh }) => {
     // Props Sync
     const [orgs, setOrgs] = useState<Organization[]>(initialOrgs);
     const [filteredOrgs, setFilteredOrgs] = useState<Organization[]>(initialOrgs);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 20;
+    const [selectedOrgIds, setSelectedOrgIds] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         setOrgs(initialOrgs);
@@ -471,7 +493,15 @@ const OrganizationsSection: React.FC<{ initialOrgs: Organization[]; onRefresh: (
             result = result.filter(o => o.subscription_end && new Date(o.subscription_end) < now);
         }
         setFilteredOrgs(result);
+        setCurrentPage(1); // Reset to first page when filters change
     };
+
+    // Calculate paginated organizations
+    const totalPages = Math.ceil(filteredOrgs.length / ITEMS_PER_PAGE);
+    const paginatedOrgs = filteredOrgs.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+    );
 
     const handleDelete = async (org: Organization) => {
         if (!confirm('هل أنت متأكد من حذف المنظمة "' + (org.name || '') + '"؟\nلن يتمكن المستخدمون من الوصول إلى حساباتهم.')) return;
@@ -492,6 +522,67 @@ const OrganizationsSection: React.FC<{ initialOrgs: Organization[]; onRefresh: (
         } else {
             setOrgs(orgs.map(o => o.id === org.id ? { ...o, is_active: newActiveState } : o));
             onRefresh();
+        }
+    };
+
+    // ==================== BULK ACTIONS ====================
+    const handleSelectAll = () => {
+        if (selectedOrgIds.size === paginatedOrgs.length) {
+            setSelectedOrgIds(new Set());
+        } else {
+            setSelectedOrgIds(new Set(paginatedOrgs.map(o => o.id)));
+        }
+    };
+
+    const handleSelectOrg = (orgId: string) => {
+        const newSelected = new Set(selectedOrgIds);
+        if (newSelected.has(orgId)) {
+            newSelected.delete(orgId);
+        } else {
+            newSelected.add(orgId);
+        }
+        setSelectedOrgIds(newSelected);
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedOrgIds.size === 0) return;
+        if (!confirm(`هل أنت متأكد من حذف ${selectedOrgIds.size} منظمة؟`)) return;
+
+        const { error } = await supabase.from('organizations').delete().in('id', Array.from(selectedOrgIds));
+        if (error) {
+            alert('خطأ: ' + error.message);
+        } else {
+            setOrgs(orgs.filter(o => !selectedOrgIds.has(o.id)));
+            setSelectedOrgIds(new Set());
+            onRefresh();
+            alert(`تم حذف ${selectedOrgIds.size} منظمة بنجاح`);
+        }
+    };
+
+    const handleBulkActivate = async () => {
+        if (selectedOrgIds.size === 0) return;
+        const { error } = await supabase.from('organizations').update({ is_active: true }).in('id', Array.from(selectedOrgIds));
+        if (error) {
+            alert('خطأ: ' + error.message);
+        } else {
+            setOrgs(orgs.map(o => selectedOrgIds.has(o.id) ? { ...o, is_active: true } : o));
+            setSelectedOrgIds(new Set());
+            onRefresh();
+            alert(`تم تفعيل ${selectedOrgIds.size} منظمة بنجاح`);
+        }
+    };
+
+    const handleBulkDeactivate = async () => {
+        if (selectedOrgIds.size === 0) return;
+        if (!confirm(`هل أنت متأكد من تعطيل ${selectedOrgIds.size} منظمة؟`)) return;
+        const { error } = await supabase.from('organizations').update({ is_active: false }).in('id', Array.from(selectedOrgIds));
+        if (error) {
+            alert('خطأ: ' + error.message);
+        } else {
+            setOrgs(orgs.map(o => selectedOrgIds.has(o.id) ? { ...o, is_active: false } : o));
+            setSelectedOrgIds(new Set());
+            onRefresh();
+            alert(`تم تعطيل ${selectedOrgIds.size} منظمة بنجاح`);
         }
     };
 
@@ -560,7 +651,7 @@ const OrganizationsSection: React.FC<{ initialOrgs: Organization[]; onRefresh: (
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800">
-                            {filteredOrgs.map((org) => (
+                            {paginatedOrgs.map((org) => (
                                 <tr key={org.id} className="hover:bg-slate-800/50 transition">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
@@ -653,7 +744,7 @@ const OrganizationsSection: React.FC<{ initialOrgs: Organization[]; onRefresh: (
 
             {/* Organizations Cards (Mobile) */}
             <div className="md:hidden space-y-4">
-                {filteredOrgs.map((org) => (
+                {paginatedOrgs.map((org) => (
                     <div key={org.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-4">
                         <div className="flex items-start justify-between">
                             <div className="flex items-center gap-3">
@@ -710,6 +801,34 @@ const OrganizationsSection: React.FC<{ initialOrgs: Organization[]; onRefresh: (
                 )}
             </div>
 
+            {/* Pagination Controls */}
+            {filteredOrgs.length > 0 && (
+                <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl p-4 mt-4">
+                    <div className="text-sm text-slate-400">
+                        عرض {(currentPage - 1) * ITEMS_PER_PAGE + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredOrgs.length)} من {filteredOrgs.length}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            className="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700 transition"
+                        >
+                            السابق
+                        </button>
+                        <span className="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-sm font-bold">
+                            {currentPage} / {totalPages}
+                        </span>
+                        <button
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages}
+                            className="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700 transition"
+                        >
+                            التالي
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Advanced Organization Management Modal */}
             {
                 selectedOrg && (
@@ -737,7 +856,7 @@ const OrganizationsSection: React.FC<{ initialOrgs: Organization[]; onRefresh: (
 const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab; onClose: () => void; onUpdate: () => void }> = ({ org, initialTab = 'info', onClose, onUpdate }) => {
     const [activeTab, setActiveTab] = useState<OrgTab>(initialTab);
     const [saving, setSaving] = useState(false);
-    const [formData, setFormData] = useState({ ...org });
+    const [formData, setFormData] = useState<Organization & { owner_phone?: string }>({ ...org, owner_phone: '' });
 
     // Owner State
     const [ownerProfile, setOwnerProfile] = useState<Profile | null>(null);
@@ -755,15 +874,80 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
     const [resetConfig, setResetConfig] = useState({ userId: '', newPassword: '' });
     const [resettingPass, setResettingPass] = useState(false);
 
+    // Plans State
+    const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
+
+    // WhatsApp Session State
+    const [systemSessionId, setSystemSessionId] = useState<string | null>(null);
+
     useEffect(() => {
+        // Always fetch system session for notifications
+        fetchSystemSession();
+
         if (activeTab === 'users' || activeTab === 'security') fetchOrgUsers();
         // Always fetch owner info for the Info tab
         fetchOwnerInfo();
+        // Fetch plans if on plan tab
+        if (activeTab === 'plan') {
+            fetchPlans();
+        }
     }, [activeTab]);
+
+    const fetchSystemSession = async () => {
+        // First try to fetch the system default session
+        let { data } = await supabase.from('whatsapp_sessions')
+            .select('id')
+            .eq('is_system_default', true)
+            .eq('status', 'connected')
+            .limit(1)
+            .maybeSingle();
+
+        // Fallback: if no system default, use the first connected session
+        if (!data) {
+            const { data: fallbackData } = await supabase.from('whatsapp_sessions')
+                .select('id')
+                .eq('status', 'connected')
+                .order('created_at', { ascending: true })
+                .limit(1)
+                .maybeSingle();
+            data = fallbackData;
+        }
+
+        if (data) {
+            setSystemSessionId(data.id);
+            console.log('[WhatsApp] Using system session:', data.id);
+        } else {
+            console.warn('[WhatsApp] No connected session found for notifications');
+        }
+    };
+
+    // Helper to format phone numbers (Egyptian & International)
+    const formatPhoneNumber = (phone: string) => {
+        if (!phone) return '';
+        let cleaned = phone.replace(/\D/g, ''); // Remove all non-digits
+
+        // Egyptian number format: 01xxxxxxxxx -> 201xxxxxxxxx
+        if (cleaned.length === 11 && cleaned.startsWith('01')) {
+            return '20' + cleaned.substring(1);
+        }
+        // If it starts with 0 but length is 10 (e.g. 010...), add 2
+        if (cleaned.startsWith('20') && cleaned.length === 12) {
+            return cleaned;
+        }
+        return cleaned;
+    };
+
+    const fetchPlans = async () => {
+        const { data } = await supabase.from('plans').select('*').eq('is_active', true);
+        if (data) setAvailablePlans(data);
+    };
 
     const fetchOwnerInfo = async () => {
         const { data } = await supabase.from('profiles').select('*').eq('org_id', org.id).eq('role', 'owner').single();
-        if (data) setOwnerProfile(data);
+        if (data) {
+            setOwnerProfile(data);
+            setFormData(prev => ({ ...prev, owner_phone: data.whatsapp_number || '' }));
+        }
     };
 
     const fetchOrgUsers = async () => {
@@ -771,6 +955,81 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
         const { data } = await supabase.from('profiles').select('*').eq('org_id', org.id);
         if (data) setOrgUsers(data);
         setLoadingUsers(false);
+    };
+
+    const sendSubscriptionNotification = async (
+        oldPlan: string,
+        newPlan: string,
+        oldStatus: boolean,
+        newStatus: boolean,
+        ownerName: string,
+        ownerPhone: string,
+        orgName: string,
+        subEnd: string
+    ) => {
+        // Validation: Only proceed if there's a real change and we have a phone number
+        if ((oldPlan === newPlan && oldStatus === newStatus) || !ownerPhone) return;
+
+        try {
+            // Determine duration based on start and end dates (approximate)
+            const startDate = new Date(formData.subscription_start || Date.now());
+            const endDate = new Date(subEnd || Date.now());
+            const durationMonths = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
+
+            const periodText = durationMonths >= 11 ? 'سنوي' : 'شهري';
+            const planName = availablePlans.find(p => p.id === newPlan)?.name_ar || newPlan;
+            const finalOwnerName = ownerName || 'العميل';
+
+            let message = '';
+
+            // Case 1: Activation
+            if (!oldStatus && newStatus) {
+                message = `🎉 *تم تفعيل اشتراكك بنجاح!*\n\nعزيزي *${finalOwnerName}*،\nيسعدنا إبلاغك بأنه تم تفعيل اشتراك منظمتك *${orgName}*.\n\n📦 *الباقة:* ${planName}\n🗓 *الفترة:* ${periodText}\n📅 *تاريخ الانتهاء:* ${subEnd}\n\nجاهزون لخدمتكم دائماً! 🚀`;
+            }
+            // Case 2: Deactivation
+            else if (oldStatus && !newStatus) {
+                message = `⛔ *تنبيه: تم إيقاف الاشتراك*\n\nعزيزي *${finalOwnerName}*،\nتم إيقاف اشتراك منظمتك *${orgName}* مؤقتاً.\nيرجى التواصل مع الإدارة لاستعادة الخدمة.\n\nشكراً لتفهمكم.`;
+            }
+            // Case 3: Plan Change (Upgrade/Downgrade)
+            else if (oldPlan !== newPlan) {
+                message = `📦 *تحديث حالة الباقة*\n\nعزيزي *${finalOwnerName}*،\nتم تحديث باقة منظمتك *${orgName}* بنجاح.\n\n✅ *الباقة الجديدة:* ${planName}\n🗓 *الفترة:* ${periodText}\n📅 *تاريخ الانتهاء:* ${subEnd}\n\nنتمنى لك تجربة ممتعة! 🌟`;
+            }
+
+            if (message) {
+                const { data: { session } } = await supabase.auth.getSession();
+
+                if (systemSessionId && session?.access_token) {
+                    const whatsappServiceUrl = import.meta.env.VITE_WHATSAPP_SERVICE_URL || 'http://localhost:3002';
+                    const response = await fetch(`${whatsappServiceUrl}/api/messages/send`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${session.access_token}`
+                        },
+                        body: JSON.stringify({
+                            sessionId: systemSessionId,
+                            phoneNumber: formatPhoneNumber(ownerPhone),
+                            message: message
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errData = await response.json();
+                        console.error('Failed to send WhatsApp:', errData);
+                        alert('فشل إرسال إشعار واتساب: ' + (errData.error || response.statusText));
+                    } else {
+                        console.log('WhatsApp notification sent successfully');
+                        alert('تم تحديث البيانات وإرسال إشعار واتساب بنجاح! 🎉');
+                    }
+                } else {
+                    console.warn('No system session or auth token available');
+                    alert('تم الحفظ، ولكن لم يتم إرسال الإشعار لعدم اتصال واتساب.');
+                }
+            }
+        } catch (err) {
+            console.error('Failed to send WhatsApp notification:', err);
+            alert('حدث خطأ غير متوقع أثناء إرسال الإشعار.');
+        }
     };
 
     const handleSave = async () => {
@@ -792,12 +1051,31 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
             return alert('خطأ أثناء حفظ المنظمة: ' + orgError.message);
         }
 
-        // 2. Update Owner Profile (if changed)
-        if (ownerProfile) {
-            const { error: profileError } = await supabase.from('profiles').update({
-                full_name: ownerProfile.full_name,
-                whatsapp_number: ownerProfile.whatsapp_number
-            }).eq('id', ownerProfile.id);
+        // 2. Update Owner Profile (only from info tab)
+        if (ownerProfile && activeTab === 'info') {
+            const updateData: { full_name?: string; whatsapp_number?: string } = {
+                full_name: ownerProfile.full_name
+            };
+
+            // Only update whatsapp_number if it has changed
+            if (formData.owner_phone && formData.owner_phone !== ownerProfile.whatsapp_number) {
+                // Check if the phone number already exists for another user
+                const { data: existingUser, error: checkError } = await supabase
+                    .from('profiles')
+                    .select('id, full_name')
+                    .eq('whatsapp_number', formData.owner_phone)
+                    .single();
+
+                if (existingUser && existingUser.id !== ownerProfile.id) {
+                    // Phone number already belongs to another user - skip update
+                    console.warn('Phone number already exists for another user:', existingUser.full_name);
+                } else if (!checkError || checkError.code === 'PGRST116') {
+                    // No existing user found (or not found error), safe to update
+                    updateData.whatsapp_number = formData.owner_phone;
+                }
+            }
+
+            const { error: profileError } = await supabase.from('profiles').update(updateData).eq('id', ownerProfile.id);
 
             if (profileError) {
                 console.error('Error updating owner:', profileError);
@@ -805,6 +1083,18 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
                 alert('تم حفظ المنظمة ولكن فشل تحديث بيانات المالك: ' + profileError.message);
             }
         }
+
+        // 3. Send WhatsApp Notification
+        await sendSubscriptionNotification(
+            org.subscription_plan,
+            formData.subscription_plan,
+            org.is_active,
+            formData.is_active,
+            ownerProfile?.full_name || 'العميل',
+            formData.owner_phone!,
+            formData.name,
+            formData.subscription_end || ''
+        );
 
         setSaving(false);
         onUpdate();
@@ -842,9 +1132,7 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
     };
 
     const getAppClient = () => {
-        // @ts-expect-error - meta.env not in types
         const url = import.meta.env.VITE_SUPABASE_URL || 'https://necqtqhmnmcsjxcxgeff.supabase.co';
-        // @ts-expect-error - meta.env not in types
         const key = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5lY3F0cWhtbm1jc2p4Y3hnZWZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzODg1NTUsImV4cCI6MjA4NDk2NDU1NX0.vpSOLJbEN1JrASDLiZ1G6-yT_QUZo0JzEDKefKANAaQ';
         return createClient(url, key, { auth: { persistSession: false } });
     };
@@ -1032,8 +1320,8 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
                                         <label htmlFor="owner-phone" className="block text-sm font-bold text-slate-400 mb-2">هاتف المالك</label>
                                         <input
                                             id="owner-phone"
-                                            value={ownerProfile?.whatsapp_number || ''}
-                                            onChange={e => ownerProfile && setOwnerProfile({ ...ownerProfile, whatsapp_number: e.target.value })}
+                                            value={formData.owner_phone}
+                                            onChange={e => setFormData({ ...formData, owner_phone: e.target.value })}
                                             className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none focus:border-blue-500"
                                             placeholder="رقم الهاتف..."
                                             disabled={!ownerProfile}
@@ -1061,8 +1349,32 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
                                 <h3 className="text-lg font-bold text-white mb-4">تحديث الاشتراك</h3>
                                 <div>
                                     <label htmlFor="plan-selector" className="block text-sm font-bold text-slate-400 mb-2">نوع الباقة</label>
-                                    <fieldset id="plan-selector" className="grid grid-cols-3 gap-3 mb-4" aria-label="اختر الباقة">
-                                        {['trial', 'starter', 'pro'].map(p => (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+                                        {availablePlans.length > 0 ? availablePlans.map(p => (
+                                            <button
+                                                key={p.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    // Auto-set dates based on plan duration (defaulting to monthly if not specified/yearly)
+                                                    // Check if plan is verified based on id or some other logic, or just let user pick dates.
+                                                    // For now, we just select the plan ID. User sets dates manually or we could prompt/auto-set.
+                                                    // Let's at least set the updated plan ID.
+                                                    setFormData({ ...formData, subscription_plan: p.id });
+                                                }}
+                                                className={`py-3 px-4 rounded-xl border font-bold text-right transition flex flex-col gap-1 ${formData.subscription_plan === p.id
+                                                    ? 'bg-blue-500/20 border-blue-500 text-blue-400'
+                                                    : 'border-slate-700 text-slate-400 hover:border-slate-600'} `}
+                                            >
+                                                <span className="text-white">{p.name_ar}</span>
+                                                <span className="text-[10px] opacity-70">{p.price_monthly} ج.م/شهر</span>
+                                            </button>
+                                        )) : (
+                                            <div className="col-span-3 text-center text-slate-500 py-4 border border-dashed border-slate-700 rounded-xl">
+                                                جاري تحميل الباقات... أو لا توجد باقات معرفة
+                                            </div>
+                                        )}
+                                        {/* Fallback for hardcoded plans if DB is empty or for legacy support */}
+                                        {availablePlans.length === 0 && ['trial', 'starter', 'pro'].map(p => (
                                             <button
                                                 key={p}
                                                 type="button"
@@ -1072,7 +1384,7 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
                                                 {p}
                                             </button>
                                         ))}
-                                    </fieldset>
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-700 mt-4">
                                     <div>
@@ -1285,7 +1597,7 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
                                     <label htmlFor="secret-key" className="block text-sm font-bold text-slate-400 mb-2">Organization Secret Key</label>
                                     <div className="flex gap-2">
                                         <code id="secret-key" className="flex-1 bg-black p-3 rounded-lg text-emerald-500 font-mono text-sm break-all">
-                                            sk_live_{org.id.replaceAll('-', '')}_xhQ29s
+                                            {generateSecretKey(org.id)}
                                         </code>
                                         <button type="button" className="px-4 bg-slate-800 text-white rounded-lg text-sm font-bold hover:bg-slate-700">
                                             نسخ
@@ -2771,13 +3083,18 @@ const DiscountCodesSection: React.FC = () => {
 
 // ==================== PAYMENT REQUESTS SECTION ====================
 
-const PaymentRequestsSection: React.FC = () => {
+const PaymentRequestsSection: React.FC<{ currentUser: Profile | null }> = ({ currentUser }) => {
     const [requests, setRequests] = useState<PaymentRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
     const [selectedRequest, setSelectedRequest] = useState<PaymentRequest | null>(null);
     const [processing, setProcessing] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
+
+    // فحص الصلاحيات
+    const canView = currentUser?.permissions.subscription?.view_requests || false;
+    const canApprove = currentUser?.permissions.subscription?.approve_requests || false;
+    const canReject = currentUser?.permissions.subscription?.reject_requests || false;
 
     useEffect(() => {
         fetchRequests();
@@ -2794,6 +3111,11 @@ const PaymentRequestsSection: React.FC = () => {
     };
 
     const handleApprove = async (request: PaymentRequest) => {
+        if (!canApprove) {
+            alert('⛔ ليس لديك صلاحية الموافقة على طلبات الدفع');
+            return;
+        }
+
         setProcessing(true);
         const sessionStr = localStorage.getItem('securefleet_session');
         const adminId = sessionStr ? JSON.parse(sessionStr).id : null;
@@ -2817,6 +3139,11 @@ const PaymentRequestsSection: React.FC = () => {
     };
 
     const handleReject = async (request: PaymentRequest) => {
+        if (!canReject) {
+            alert('⛔ ليس لديك صلاحية رفض طلبات الدفع');
+            return;
+        }
+
         if (!rejectReason.trim()) return alert('يرجى إدخال سبب الرفض');
 
         setProcessing(true);

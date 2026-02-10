@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: myfleet-whatsapp-service
+    env: docker
+    region: frankfurt
+    plan: starter
+    branch: main
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: FRONTEND_URL
+        value: https://myfleet-pro.onrender.com
+        sync: false
+      - key: PORT
+        value: 3002
+        sync: false
+      - key: NODE_ENV
+        value: production
+        sync: false

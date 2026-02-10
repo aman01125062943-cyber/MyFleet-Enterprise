@@ -1,14 +1,75 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ShieldCheck, Car, BarChart3, Users, ArrowRight,
   Calculator, Smartphone, Globe, Menu, X, Mail, Phone, MapPin,
   Package, Truck, Megaphone
 } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
+import { Plan } from '../types';
+import PricingSection from './PricingSection';
 
 const LandingPage: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
+  const [showPricing, setShowPricing] = useState(false);
+
+  // Smooth scroll to section
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoadingPlans(true);
+        console.log('🔍 LandingPage: Fetching data...');
+
+        // 1. Fetch visibility config
+        const { data: configData, error: configError } = await supabase
+          .from('public_config')
+          .select('show_pricing_page')
+          .single();
+
+        console.log('📊 Config data:', configData);
+        console.log('⚠️ Config error:', configError);
+
+        if (configError) throw configError;
+
+        const showPricingValue = configData?.show_pricing_page || false;
+        console.log('✅ show_pricing_page value:', showPricingValue);
+        setShowPricing(showPricingValue);
+
+        // 2. Fetch plans from 'plans' table
+        const { data: plansData, error: plansError } = await supabase
+          .from('plans')
+          .select('*')
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true });
+
+        console.log('📊 Plans data:', plansData);
+        console.log('⚠️ Plans error:', plansError);
+
+        if (plansError) throw plansError;
+        if (plansData) {
+          setPlans(plansData as Plan[]);
+        }
+
+        console.log('✅ LandingPage: Data fetched successfully');
+
+      } catch (err) {
+        console.error('❌ Error fetching data:', err);
+      } finally {
+        setLoadingPlans(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] text-slate-900 dark:text-white font-[Cairo] overflow-x-hidden transition-colors duration-300">
@@ -30,12 +91,12 @@ const LandingPage: React.FC = () => {
 
           {/* Desktop Links */}
           <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white font-medium transition text-sm">المميزات</a>
-            <a href="#pricing" className="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white font-medium transition text-sm">الأسعار</a>
+            <button onClick={() => scrollToSection('features')} className="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white font-medium transition text-sm bg-transparent border-none cursor-pointer">المميزات</button>
+            {showPricing && <button onClick={() => scrollToSection('pricing')} className="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white font-medium transition text-sm bg-transparent border-none cursor-pointer">الأسعار</button>}
             <div className="h-6 w-px bg-gray-200 dark:bg-slate-800"></div>
             <Link to="/login" className="text-slate-900 dark:text-white font-bold text-sm hover:text-blue-600 dark:hover:text-blue-400 transition">تسجيل دخول</Link>
-            <Link to="/login" className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition shadow-lg shadow-blue-900/20 hover:scale-105">
-              ابدأ تجربتك المجانية
+            <Link to="/login?mode=register" className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition shadow-lg shadow-blue-900/20 hover:scale-105">
+              جرب مجاناً لمدة 14 يوم
             </Link>
           </div>
 
@@ -48,8 +109,8 @@ const LandingPage: React.FC = () => {
         {/* Mobile Menu Content */}
         {mobileMenuOpen && (
           <div className="md:hidden bg-[#1e293b] border-b border-slate-700 p-4 space-y-4 animate-in slide-in-from-top-5">
-            <a href="#features" className="block text-slate-300 hover:text-white font-bold" onClick={() => setMobileMenuOpen(false)}>المميزات</a>
-            <a href="#pricing" className="block text-slate-300 hover:text-white font-bold" onClick={() => setMobileMenuOpen(false)}>الأسعار</a>
+            <button onClick={() => { scrollToSection('features'); setMobileMenuOpen(false); }} className="block text-slate-300 hover:text-white font-bold bg-transparent border-none cursor-pointer w-full text-right">المميزات</button>
+            {showPricing && <button onClick={() => { scrollToSection('pricing'); setMobileMenuOpen(false); }} className="block text-slate-300 hover:text-white font-bold bg-transparent border-none cursor-pointer w-full text-right">الأسعار</button>}
             <Link to="/login" className="block text-blue-400 font-bold" onClick={() => setMobileMenuOpen(false)}>تسجيل دخول</Link>
           </div>
         )}
@@ -81,12 +142,12 @@ const LandingPage: React.FC = () => {
           </p>
 
           <div className="flex flex-col md:flex-row justify-center gap-4 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-200">
-            <Link to="/login" className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-4 rounded-2xl font-bold text-lg flex items-center justify-center gap-2 shadow-xl shadow-emerald-900/30 transition hover:-translate-y-1">
-              جرب النظام مجاناً <ArrowRight className="w-5 h-5" />
+            <Link to="/login?mode=register" className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-4 rounded-2xl font-bold text-lg flex items-center justify-center gap-2 shadow-xl shadow-emerald-900/30 transition hover:-translate-y-1">
+              ابدأ تجربة 14 يوم مجاناً <ArrowRight className="w-5 h-5" />
             </Link>
-            <a href="#features" className="bg-white dark:bg-[#1e293b] hover:bg-gray-50 dark:hover:bg-slate-700 text-slate-900 dark:text-white px-8 py-4 rounded-2xl font-bold text-lg border border-gray-200 dark:border-slate-700 transition flex items-center justify-center gap-2 shadow-lg dark:shadow-none">
+            <button onClick={() => scrollToSection('features')} className="bg-white dark:bg-[#1e293b] hover:bg-gray-50 dark:hover:bg-slate-700 text-slate-900 dark:text-white px-8 py-4 rounded-2xl font-bold text-lg border border-gray-200 dark:border-slate-700 transition flex items-center justify-center gap-2 shadow-lg dark:shadow-none cursor-pointer">
               اكتشف المميزات
-            </a>
+            </button>
           </div>
 
           {/* Stats Preview */}
@@ -223,19 +284,21 @@ const LandingPage: React.FC = () => {
       </div>
 
       {/* 4. Pricing Section (Dynamic) */}
-      <div id="pricing" className="py-24 bg-gradient-to-b from-[#0f172a] to-[#1e293b]">
-        {loadingPlans ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-slate-400">جاري تحميل الباقات...</p>
-          </div>
-        ) : (
-          <PricingSection
-            plans={plans}
-            onSelectPlan={(plan) => window.location.href = '/login'}
-          />
-        )}
-      </div>
+      {showPricing && (
+        <div id="pricing" className="py-24 bg-gradient-to-b from-[#0f172a] to-[#1e293b]">
+          {loadingPlans ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p className="text-slate-400">جاري تحميل الباقات...</p>
+            </div>
+          ) : (
+            <PricingSection
+              plans={plans}
+              onSelectPlan={(_plan) => window.location.href = '/login?mode=register'}
+            />
+          )}
+        </div>
+      )}
 
       {/* 5. Footer */}
       <footer className="bg-[#020617] border-t border-slate-800 py-12">
@@ -253,9 +316,9 @@ const LandingPage: React.FC = () => {
           <div>
             <h4 className="font-bold text-white mb-4">روابط سريعة</h4>
             <ul className="space-y-2 text-sm text-slate-400">
-              <li><a href="#" className="hover:text-white">الرئيسية</a></li>
-              <li><a href="#features" className="hover:text-white">المميزات</a></li>
-              <li><a href="#pricing" className="hover:text-white">الأسعار</a></li>
+              <li><button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="hover:text-white bg-transparent border-none cursor-pointer text-slate-400">الرئيسية</button></li>
+              <li><button onClick={() => scrollToSection('features')} className="hover:text-white bg-transparent border-none cursor-pointer text-slate-400">المميزات</button></li>
+              {showPricing && <li><button onClick={() => scrollToSection('pricing')} className="hover:text-white bg-transparent border-none cursor-pointer text-slate-400">الأسعار</button></li>}
               <li><Link to="/login" className="hover:text-white">تسجيل الدخول</Link></li>
             </ul>
           </div>

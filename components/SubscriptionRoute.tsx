@@ -17,7 +17,7 @@ const SubscriptionRoute: React.FC = () => {
     }
 
     // ⭐ Admin Preview Mode: If admin has no org, create a dummy one
-    const effectiveOrg = org || (user.role === 'admin' || user.role === 'owner' ? {
+    const effectiveOrg = org || (user.role === 'admin' || user.role === 'owner' || user.role === 'super_admin' ? {
         id: 'preview_mode',
         name: 'معاينة (وضع المسؤول)',
         subscription_plan: 'starter', // Default for preview

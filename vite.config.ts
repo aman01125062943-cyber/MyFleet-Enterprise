@@ -14,12 +14,20 @@ export default defineConfig({
 
   server: {
     host: true,
-    port: 5174,
+    port: 5173,
     strictPort: true,
     watch: {
       useFsEvents: false,  // Disable native FS events on WSL2
       usePolling: true,        // Enable polling to detect changes
     },
+    // Proxy API requests to WhatsApp Server
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   },
 
   build: {
