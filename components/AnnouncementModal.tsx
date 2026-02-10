@@ -51,8 +51,8 @@ const AnnouncementModal: React.FC = () => {
     if (!show || !data) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl relative border border-white/10 animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-lg sm:rounded-3xl rounded-t-3xl overflow-hidden shadow-2xl relative border border-white/10 animate-in slide-in-from-bottom sm:zoom-in-95 duration-300">
 
                 {/* Header Graphic */}
                 <div className="bg-gradient-to-br from-blue-600 to-purple-600 p-6 text-white relative overflow-hidden">
