@@ -55,6 +55,7 @@ export interface HealthSummary {
 // Configuration
 const HEALTH_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const WHATSAPP_SERVER_URL = import.meta.env.VITE_WHATSAPP_SERVER_URL || 'http://localhost:3002';
+const WHATSAPP_ENABLED = import.meta.env.VITE_WHATSAPP_ENABLED !== 'false'; // Default: enabled
 
 let monitoringInterval: ReturnType<typeof setInterval> | null = null;
 let isMonitoring = false;
@@ -176,6 +177,12 @@ export async function checkSystemHealth(): Promise<HealthCheckResult | null> {
  * Check WhatsApp service health
  */
 async function checkWhatsAppHealth(): Promise<void> {
+  // Skip health check if WhatsApp is disabled
+  if (!WHATSAPP_ENABLED) {
+    console.log('⏭️ WhatsApp health check skipped (service disabled)');
+    return;
+  }
+
   try {
     const response = await fetch(`${WHATSAPP_SERVER_URL}/health`);
 

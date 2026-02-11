@@ -369,6 +369,7 @@ export const WhatsAppCampaignManager: React.FC<WhatsAppCampaignManagerProps> = (
                             value={minDelay}
                             onChange={(e) => setMinDelay(Number(e.target.value))}
                             className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white"
+                            style={{ direction: 'ltr' }}
                         />
                     </div>
                     <div>
@@ -379,6 +380,7 @@ export const WhatsAppCampaignManager: React.FC<WhatsAppCampaignManagerProps> = (
                             value={maxDelay}
                             onChange={(e) => setMaxDelay(Number(e.target.value))}
                             className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white"
+                            style={{ direction: 'ltr' }}
                         />
                     </div>
                 </div>

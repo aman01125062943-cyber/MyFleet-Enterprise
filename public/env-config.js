@@ -11,6 +11,8 @@ window._env_ = {
     // For runtime override, deployment scripts can inject values here
     VITE_SUPABASE_URL: '',
     VITE_SUPABASE_ANON_KEY: '',
+    VITE_WHATSAPP_SERVER_URL: '',
+    VITE_WHATSAPP_ENABLED: 'true', // Set to 'false' to disable WhatsApp health checks
     APP_VERSION: '1.0.0'
 };
 
