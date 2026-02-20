@@ -37,16 +37,16 @@ const notificationScheduler = new NotificationScheduler(notificationService, sup
 notificationScheduler.init();
 
 // Middleware
-const allowedOrigins = [
+const allowedOrigins = new Set([
     'http://localhost:5173',
     'http://localhost:3002',
     process.env.FRONTEND_URL,
     'https://myfleet-pro.onrender.com'
-].filter(Boolean);
+].filter(Boolean));
 
 app.use(cors({
     origin: function (origin, callback) {
-        if (!origin || allowedOrigins.includes(origin)) {
+        if (!origin || allowedOrigins.has(origin)) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
@@ -126,6 +126,7 @@ async function authenticateJWT(req, res, next) {
         next();
 
     } catch (error) {
+        console.error('[Auth] Authentication failed:', error);
         return res.status(401).json({ error: 'Authentication failed' });
     }
 }
@@ -409,8 +410,8 @@ app.get('/api/sessions/:sessionId/qr', authenticateJWT, async (req, res) => {
             response.message = 'Connecting to WhatsApp...';
             console.log(`[QR] 🔄 Session ${sessionId} is connecting, waiting for QR`);
         } else if (qrCode) {
-            response.message = 'QR code ready';
-            console.log(`[QR] ✅ QR code available for ${sessionId}`);
+            response.message = 'QR code available';
+            console.log(`[QR] ✅ QR code available for ${sessionId} (state: ${currentSessionState})`);
         }
 
         res.json(response);
@@ -752,7 +753,7 @@ function buildNotificationMessage(type, variables) {
     const vars = variables || {};
 
     switch (type) {
-        case 'trial_welcome':
+        case 'trial_welcome': {
             const trialDays = vars.trialDays || 14;
             return `🎉 *مرحباً بك في مدير الأسطول!*
 
@@ -780,6 +781,7 @@ function buildNotificationMessage(type, variables) {
 ⚠️ فترة التجربة مجانية تماماً لمدة ${trialDays} يوماً
 
 📞 تحتاج مساعدة؟ نحن هنا لدعمك!`;
+        }
 
         case 'paid_welcome':
             return `✅ *تم تفعيل اشتراكك بنجاح!*
@@ -1119,9 +1121,6 @@ setInterval(processNotifications, 10000);
 setInterval(checkExpiringSubscriptions, 60 * 60 * 1000); // 1 hour
 
 // ==================== SERVE FRONTEND (SINGLE PORT MODE) ====================
-// Serve static files from the React app build directory
-const distPath = path.join(__dirname, '../dist');
-app.use(express.static(distPath));
 
 // Handle React routing, return all requests to React app
 app.get('*', (req, res, next) => {
