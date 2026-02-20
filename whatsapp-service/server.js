@@ -8,8 +8,8 @@ import NotificationService from './NotificationService.js';
 import NotificationScheduler from './NotificationScheduler.js';
 
 // Load environment variables
-import path from 'path';
-import { fileURLToPath } from 'url';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '.env') });
 
@@ -335,7 +335,6 @@ app.get('/api/sessions/:sessionId/qr', authenticateJWT, async (req, res) => {
         }
 
         // Check if session is currently initializing
-        const isInitializing = sessionManager.isInitializing(sessionId);
         const sessionState = sessionManager.getSessionState(sessionId);
 
         console.log(`[QR] Session ${sessionId} state: ${sessionState}`);
@@ -701,7 +700,7 @@ app.get('/api/messages', authenticateJWT, async (req, res) => {
             .from('whatsapp_messages')
             .select('*')
             .order('created_at', { ascending: false })
-            .limit(parseInt(limit));
+            .limit(Number.parseInt(limit));
 
         if (sessionId) {
             query = query.eq('id', sessionId);
@@ -804,7 +803,7 @@ function buildNotificationMessage(type, variables) {
 ✅ تقارير مالية متقدمة
 ✅ نظام تنبيهات ذكي`;
 
-        case 'expiry_reminder':
+        case 'expiry_reminder': {
             const daysLeft = vars.daysRemaining || 0;
             return `⏰ *تذكير: انتهاء الاشتراك قريباً*
 
@@ -817,6 +816,7 @@ function buildNotificationMessage(type, variables) {
 لضمان استمرارية الخدمة، يرجى تجديد الاشتراك قبل انتهاء الفترة الحالية.
 
 📞 للدعم والمساعدة: تواصل معنا`;
+        }
 
         case 'expiry_urgent':
             return `🚨 *تنبيه عاجل: انتهاء الاشتراك*
