@@ -37,11 +37,28 @@ const notificationScheduler = new NotificationScheduler(notificationService, sup
 notificationScheduler.init();
 
 // Middleware
+const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3002',
+    process.env.FRONTEND_URL,
+    'https://myfleet-pro.onrender.com'
+].filter(Boolean);
+
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true
 }));
 app.use(express.json());
+
+// Serve static files from the React app
+const distPath = path.join(__dirname, '../dist');
+app.use(express.static(distPath));
 
 // Rate limiting storage (simple in-memory)
 const rateLimitStore = new Map();
@@ -198,37 +215,18 @@ app.post('/test-send-internal', async (req, res) => {
             success: true,
             message: 'Message sent successfully',
             sessionId: activeSession.sessionId,
-            result: {
-                id: result?.key?.id,
-                to: result?.key?.remoteJid,
-                timestamp: result?.messageTimestamp
-            }
+            result
         });
 
     } catch (error) {
-        console.error('[TEST] Send failed:', error);
-
-        // Provide detailed error information
-        let errorDetails = error.message;
-
-        if (error.message.includes('Session') && error.message.includes('not found')) {
-            errorDetails = 'WhatsApp session not found or not initialized. Please scan QR code first.';
-        } else if (error.message.includes('not connected')) {
-            errorDetails = 'WhatsApp session is not connected. Please scan QR code first.';
-        } else if (error.message.includes('401')) {
-            errorDetails = 'Authentication failed. Session may be expired. Please reconnect.';
-        } else if (error.message.includes('410') || error.message.includes('gone')) {
-            errorDetails = 'Session is gone. Please clear auth_sessions folder and reconnect.';
-        }
-
+        console.error('[TEST] Internal send error:', error);
         res.status(500).json({
             success: false,
-            error: error.message,
-            details: errorDetails,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            error: error.message
         });
     }
 });
+
 
 // ==================== SESSION ROUTES ====================
 

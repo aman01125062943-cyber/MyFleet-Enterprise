@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"vite\" \"cd whatsapp-service && npm run dev\"",
-    "start": "concurrently \"vite\" \"cd whatsapp-service && npm start\"",
-    "build": "vite build",
+    "start": "cd whatsapp-service && npm start",
+    "build": "vite build && cd whatsapp-service && npm install",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -54,7 +54,8 @@ export interface HealthSummary {
 
 // Configuration
 const HEALTH_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
-const WHATSAPP_SERVER_URL = import.meta.env.VITE_WHATSAPP_SERVER_URL || 'http://localhost:3002';
+const isDev = import.meta.env.DEV;
+const WHATSAPP_SERVER_URL = import.meta.env.VITE_WHATSAPP_SERVER_URL || (isDev ? 'http://localhost:3002' : '');
 const WHATSAPP_ENABLED = import.meta.env.VITE_WHATSAPP_ENABLED !== 'false'; // Default: enabled
 
 let monitoringInterval: ReturnType<typeof setInterval> | null = null;
