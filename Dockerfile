@@ -5,32 +5,37 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies first (for caching)
+# Install dependencies for both root and whatsapp-service
 COPY package*.json ./
 RUN npm ci
 
-# Copy source and build
+COPY whatsapp-service/package*.json ./whatsapp-service/
+RUN cd whatsapp-service && npm ci
+
+# Copy source and build the frontend
 COPY . .
 RUN npm run build
 
 # ===========================================
-# Stage 2: Production Server (Nginx)
+# Stage 2: Production Server (Node.js)
 # ===========================================
-FROM nginx:stable-alpine
+FROM node:20-alpine
 
-# Copy custom nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
 
-# Copy build files from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Copy package files and install production dependencies
+COPY whatsapp-service/package*.json ./
+RUN npm ci --only=production
 
-# Copy entrypoint script to inject env vars at runtime
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+# Copy the built frontend from builder stage
+COPY --from=builder /app/dist ./dist
 
-# Expose port 80
-EXPOSE 80
+# Copy the whatsapp-service source code
+COPY whatsapp-service/ .
 
-# Run entrypoint script then start nginx
-ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["nginx", "-g", "daemon off;"]
+# Expose the WhatsApp service port
+EXPOSE 3002
+
+# The server.js in whatsapp-service already serves ../dist
+CMD ["node", "server.js"]
+

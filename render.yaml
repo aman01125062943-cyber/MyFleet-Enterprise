@@ -1,27 +1,20 @@
 services:
   - type: web
-    name: myfleet-pro
-    env: docker
-    region: frankfurt
-    plan: free
-    branch: main
-    envVars:
-      - key: VITE_SUPABASE_URL
-        sync: false
-      - key: VITE_SUPABASE_ANON_KEY
-        sync: false
-  - type: web
-    name: myfleet-whatsapp
+    name: myfleet-unified
     env: docker
     region: frankfurt
     plan: free
     branch: main
     envVars:
       - key: SUPABASE_URL
-        sync: false
+        value: https://necqtqhmnmcsjxcxgeff.supabase.co
       - key: SUPABASE_SERVICE_KEY
         sync: false
-      - key: PORT
-        value: 3002
+      - key: VITE_SUPABASE_URL
+        value: https://necqtqhmnmcsjxcxgeff.supabase.co
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: 3002
