@@ -5,6 +5,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Install git needed for some dependencies
+RUN apk add --no-cache git
+
 # Install dependencies for both root and whatsapp-service
 COPY package*.json ./
 RUN npm install
@@ -23,6 +26,9 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# Install git even in production if needed by any runtime dependencies
+RUN apk add --no-cache git
+
 # Copy package files and install production dependencies
 COPY whatsapp-service/package*.json ./
 RUN npm install --omit=dev
@@ -38,5 +44,6 @@ EXPOSE 3002
 
 # The server.js in whatsapp-service already serves ../dist
 CMD ["node", "server.js"]
+
 
 
