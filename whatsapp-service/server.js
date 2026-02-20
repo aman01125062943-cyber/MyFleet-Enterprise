@@ -58,6 +58,20 @@ app.use(express.json());
 
 // Serve static files from the React app
 const distPath = path.join(__dirname, '../dist');
+
+// Serve assets explicitly to ensure correct MIME types
+app.use('/assets', express.static(path.join(distPath, 'assets')));
+
+// Serve other PWA and static files explicitly
+app.use('/workbox-*.js', express.static(distPath));
+app.use('/sw.js', express.static(distPath));
+app.use('/manifest.webmanifest', express.static(distPath));
+app.use('/favicon.ico', express.static(distPath));
+app.use('/pwa-*.png', express.static(distPath));
+app.use('/apple-touch-icon.png', express.static(distPath));
+app.use('/mask-icon.svg', express.static(distPath));
+
+// Fallback for any other static files in dist
 app.use(express.static(distPath));
 
 // Rate limiting storage (simple in-memory)
