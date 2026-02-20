@@ -59,20 +59,14 @@ app.use(express.json());
 // Serve static files from the React app
 const distPath = path.join(__dirname, '../dist');
 
-// Serve assets explicitly to ensure correct MIME types
-app.use('/assets', express.static(path.join(distPath, 'assets')));
-
-// Serve other PWA and static files explicitly
-app.use('/workbox-*.js', express.static(distPath));
-app.use('/sw.js', express.static(distPath));
-app.use('/manifest.webmanifest', express.static(distPath));
-app.use('/favicon.ico', express.static(distPath));
-app.use('/pwa-*.png', express.static(distPath));
-app.use('/apple-touch-icon.png', express.static(distPath));
-app.use('/mask-icon.svg', express.static(distPath));
-
-// Fallback for any other static files in dist
+// Serve all static files normally
 app.use(express.static(distPath));
+
+// Protect /assets from falling through to the React catch-all
+// If an asset is missing (e.g. old cached version requested), return 404 instead of index.html
+app.use('/assets', (req, res) => {
+    res.status(404).send('Asset not found');
+});
 
 // Rate limiting storage (simple in-memory)
 const rateLimitStore = new Map();
