@@ -1119,8 +1119,20 @@ setInterval(processNotifications, 10000);
 
 // Start Auto Job Scheduler (Check every hour)
 setInterval(checkExpiringSubscriptions, 60 * 60 * 1000); // 1 hour
-// Run immediately on startup for testing (only if in correct time window)
-// checkExpiringSubscriptions();
+
+// ==================== SERVE FRONTEND (SINGLE PORT MODE) ====================
+// Serve static files from the React app build directory
+const distPath = path.join(__dirname, '../dist');
+app.use(express.static(distPath));
+
+// Handle React routing, return all requests to React app
+app.get('*', (req, res, next) => {
+    // Skip API routes
+    if (req.path.startsWith('/api')) {
+        return next();
+    }
+    res.sendFile(path.join(distPath, 'index.html'));
+});
 
 // ==================== START SERVER ====================
 

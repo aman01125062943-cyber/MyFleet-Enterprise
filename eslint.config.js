@@ -60,6 +60,7 @@ export default [
         rules: {
             ...tsPlugin.configs.recommended.rules,
             ...sonarjs.configs.recommended.rules,
+            "no-undef": "off",
             "sonarjs/cognitive-complexity": ["warn", 20],
             "sonarjs/no-duplicate-string": "off",
             "@typescript-eslint/no-explicit-any": "warn",

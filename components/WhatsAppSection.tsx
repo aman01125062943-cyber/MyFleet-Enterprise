@@ -11,7 +11,8 @@ import { WhatsAppCampaignManager } from './whatsapp/WhatsAppCampaignManager';
 // ============================================================================
 
 // Use relative URL - Vite proxy forwards /api/* to WhatsApp server
-const WHATSAPP_SERVER_URL = '';
+// Use environment variable for WhatsApp server URL
+const WHATSAPP_SERVER_URL = import.meta.env.VITE_WHATSAPP_SERVICE_URL || '';
 const SYSTEM_SESSION_NAME = 'نظام الإشعارات الرئيسي';
 
 // ============================================================================
@@ -449,8 +450,8 @@ const WhatsAppSection: React.FC = () => {
                 <button
                     onClick={() => setActiveTab('sessions')}
                     className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'sessions'
-                            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                        ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                         }`}
                 >
                     <Settings className="w-4 h-4" />
@@ -459,8 +460,8 @@ const WhatsAppSection: React.FC = () => {
                 <button
                     onClick={() => setActiveTab('campaigns')}
                     className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all ${activeTab === 'campaigns'
-                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                         }`}
                 >
                     <Megaphone className="w-4 h-4" />

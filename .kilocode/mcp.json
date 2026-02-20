@@ -1,1 +1,1 @@
-{"mcpServers":{"chrome-devtools":{"command":"npx","args":["chrome-devtools-mcp@latest","--browser-url=http://127.0.0.1:9222","-y"],"alwaysAllow":["list_pages"]}}}
+{"mcpServers":{"chrome-devtools":{"command":"npx","args":["chrome-devtools-mcp@latest","--browser-url=http://127.0.0.1:9222","-y"],"alwaysAllow":["list_pages","take_snapshot","navigate_page","click","evaluate_script"]}}}

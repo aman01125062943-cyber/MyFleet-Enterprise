@@ -8,11 +8,9 @@ import {
   User, Users, LogOut, Shield, Plus, Trash2, AlertCircle, FileText,
   Building, CreditCard, Lock, Save, Loader2, Printer, TrendingUp, TrendingDown, Edit
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { performGlobalLogout } from '../lib/authUtils';
 
 const Settings: React.FC = () => {
-  const navigate = useNavigate();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'general' | 'branding' | 'drivers' | 'templates' | 'security' | 'announcements'>('general');
 
@@ -51,13 +49,14 @@ const Settings: React.FC = () => {
     logo_url: '',
     address: '',
     phone: '',
+    support_number: '',
     footer_text: ''
   });
 
   useEffect(() => {
     const loadData = async () => {
       // Use currentUser from context instead of localStorage
-      if (currentUser && currentUser.org_id) {
+      if (currentUser?.org_id) {
         // 2. Fetch Drivers
         const { data: driversData } = await supabase.from('drivers').select().eq('org_id', currentUser.org_id).order('created_at', { ascending: false });
         if (driversData) setDrivers(driversData as Driver[]);
@@ -96,12 +95,14 @@ const Settings: React.FC = () => {
       password: passwordData.new
     });
     setActionLoading(false);
-    if (!error) {
-      showToast('تم تغيير كلمة المرور بنجاح', 'success');
-      setPasswordData({ current: '', new: '', confirm: '' });
-    } else {
+    
+    if (error) {
       showToast('خطأ: ' + error.message, 'error');
+      return;
     }
+    
+    showToast('تم تغيير كلمة المرور بنجاح', 'success');
+    setPasswordData({ current: '', new: '', confirm: '' });
   };
 
   const handleSaveBranding = async (e: React.FormEvent) => {
@@ -115,12 +116,13 @@ const Settings: React.FC = () => {
     const { error } = await supabase.from('organizations').update({ settings: branding }).eq('id', org.id);
     setActionLoading(false);
 
-    if (!error) {
-      showToast('تم حفظ إعدادات الهوية بنجاح', 'success');
-    } else {
+    if (error) {
       console.error('Save Error:', error);
       showToast('خطأ أثناء الحفظ: ' + error.message, 'error');
+      return;
     }
+    
+    showToast('تم حفظ إعدادات الهوية بنجاح', 'success');
   };
 
   const handleAddDriver = async (e: React.FormEvent) => {
@@ -141,25 +143,28 @@ const Settings: React.FC = () => {
 
     setActionLoading(false);
 
-    if (!error && data) {
-      setDrivers([data, ...drivers]);
-      setShowAddDriver(false);
-      setNewDriver({ full_name: '', phone_number: '', license_number: '' });
-      showToast('تم إضافة السائق بنجاح', 'success');
-    } else {
+    if (error || !data) {
       showToast('خطأ في الإضافة: ' + error?.message, 'error');
+      return;
     }
+
+    setDrivers([data, ...drivers]);
+    setShowAddDriver(false);
+    setNewDriver({ full_name: '', phone_number: '', license_number: '' });
+    showToast('تم إضافة السائق بنجاح', 'success');
   };
 
   const handleDeleteDriver = async (id: string) => {
     if (!confirm('هل أنت متأكد من حذف هذا السائق؟')) return;
     const { error } = await supabase.from('drivers').delete().eq('id', id);
-    if (!error) {
-      setDrivers(drivers.filter(d => d.id !== id));
-      showToast('تم حذف السائق بنجاح', 'success');
-    } else {
+    
+    if (error) {
       showToast('خطأ أثناء الحذف', 'error');
+      return;
     }
+
+    setDrivers(drivers.filter(d => d.id !== id));
+    showToast('تم حذف السائق بنجاح', 'success');
   };
 
   const handleAddTemplate = async (e: React.FormEvent) => {
@@ -193,7 +198,7 @@ const Settings: React.FC = () => {
 
       if (!isExisting) {
         // Add new category
-        const newCatId = newTemplate.category.trim().replace(/\s+/g, '_').toLowerCase();
+        const newCatId = newTemplate.category.trim().replaceAll(/\s+/g, '_').toLowerCase();
         const newCategoryObj = { id: newCatId, label: newTemplate.category };
 
         categories[type].push(newCategoryObj);
@@ -217,7 +222,7 @@ const Settings: React.FC = () => {
     const payload = {
       user_id: currentUser.id,
       title: newTemplate.title,
-      amount: parseFloat(newTemplate.amount) || 0,
+      amount: Number.parseFloat(newTemplate.amount) || 0,
       category: newTemplate.category,
       type: newTemplate.type,
       is_active: newTemplate.is_active
@@ -237,32 +242,35 @@ const Settings: React.FC = () => {
 
     setActionLoading(false);
 
-    if (!error && data) {
-      if (editingTemplateId) {
-        setTemplates(templates.map(t => t.id === editingTemplateId ? data : t));
-        showToast('تم تحديث القالب بنجاح', 'success');
-      } else {
-        setTemplates([data, ...templates]);
-        showToast('تم إضافة القالب بنجاح', 'success');
-      }
-      setShowAddTemplate(false);
-      setEditingTemplateId(null); // Reset
-      setNewTemplate({ title: '', amount: '', category: '', type: 'expense', is_active: true });
-    } else {
+    if (error || !data) {
       console.error('Supabase Error:', error);
       showToast('خطأ أثناء الحفظ: ' + (error?.message || 'Unknown error'), 'error');
+      return;
     }
+
+    if (editingTemplateId) {
+      setTemplates(templates.map(t => t.id === editingTemplateId ? data : t));
+      showToast('تم تحديث القالب بنجاح', 'success');
+    } else {
+      setTemplates([data, ...templates]);
+      showToast('تم إضافة القالب بنجاح', 'success');
+    }
+    setShowAddTemplate(false);
+    setEditingTemplateId(null); // Reset
+    setNewTemplate({ title: '', amount: '', category: '', type: 'expense', is_active: true });
   };
 
   const handleDeleteTemplate = async (id: string) => {
     if (!confirm('هل تريد حذف هذا القالب؟')) return;
     const { error } = await supabase.from('expense_templates').delete().eq('id', id);
-    if (!error) {
-      setTemplates(templates.filter(t => t.id !== id));
-      showToast('تم حذف القالب', 'success');
-    } else {
+    
+    if (error) {
       showToast('خطأ أثناء الحذف', 'error');
+      return;
     }
+
+    setTemplates(templates.filter(t => t.id !== id));
+    showToast('تم حذف القالب', 'success');
   };
 
   // --- Render Helpers ---
@@ -354,11 +362,11 @@ const Settings: React.FC = () => {
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-slate-500 mb-1">الاسم الكامل</label>
+                  <span className="text-xs font-bold text-slate-500 mb-1 block">الاسم الكامل</span>
                   <div className="bg-gray-50 dark:bg-[#0f172a] p-3 rounded-xl text-slate-800 dark:text-white font-bold">{currentUser?.full_name}</div>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500 mb-1">اسم المستخدم</label>
+                  <span className="text-xs font-bold text-slate-500 mb-1 block">اسم المستخدم</span>
                   <div className="bg-gray-50 dark:bg-[#0f172a] p-3 rounded-xl text-slate-800 dark:text-white font-mono">{currentUser?.username}</div>
                 </div>
               </div>
@@ -376,8 +384,8 @@ const Settings: React.FC = () => {
 
             <form onSubmit={handleSaveBranding} className="space-y-4 max-w-2xl">
               <div>
-                <label className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2 block">رابط الشعار (Logo URL)</label>
-                <input type="text" className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-left ltr placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:border-purple-500 outline-none"
+                <label htmlFor="branding_logo" className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2 block">رابط الشعار (Logo URL)</label>
+                <input id="branding_logo" type="text" className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-left ltr placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:border-purple-500 outline-none"
                   placeholder="https://example.com/logo.png"
                   value={branding.logo_url || ''} onChange={e => setBranding({ ...branding, logo_url: e.target.value })} />
                 {branding.logo_url && (
@@ -386,21 +394,27 @@ const Settings: React.FC = () => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2 block">العنوان</label>
-                  <input type="text" className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-purple-500 outline-none"
+                  <label htmlFor="branding_address" className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2 block">العنوان</label>
+                  <input id="branding_address" type="text" className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-purple-500 outline-none"
                     placeholder="الرياض - العليا"
                     value={branding.address || ''} onChange={e => setBranding({ ...branding, address: e.target.value })} />
                 </div>
                 <div>
-                  <label className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2 block">الهاتف</label>
-                  <input type="text" className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-purple-500 outline-none"
+                  <label htmlFor="branding_phone" className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2 block">الهاتف</label>
+                  <input id="branding_phone" type="text" className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-purple-500 outline-none"
                     placeholder="011-xxxxxxx"
                     value={branding.phone || ''} onChange={e => setBranding({ ...branding, phone: e.target.value })} />
                 </div>
+                <div>
+                  <label htmlFor="branding_support" className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2 block">رقم الدعم الفني</label>
+                  <input id="branding_support" type="text" className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-purple-500 outline-none"
+                    placeholder="05xxxxxxxx"
+                    value={branding.support_number || ''} onChange={e => setBranding({ ...branding, support_number: e.target.value })} />
+                </div>
               </div>
               <div>
-                <label className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2 block">نص التذييل (Footer)</label>
-                <input type="text" className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-purple-500 outline-none"
+                <label htmlFor="branding_footer" className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2 block">نص التذييل (Footer)</label>
+                <input id="branding_footer" type="text" className="w-full px-4 py-3 bg-gray-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-purple-500 outline-none"
                   placeholder="شكرا لتعاملكم معنا..."
                   value={branding.footer_text || ''} onChange={e => setBranding({ ...branding, footer_text: e.target.value })} />
               </div>

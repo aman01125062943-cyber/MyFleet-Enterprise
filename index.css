@@ -7,9 +7,6 @@
 /* Enable class-based dark mode */
 @variant dark (&:where(.dark, .dark *));
 
-/* Force Dark Mode via Class Strategy for Tailwind v4 */
-@variant dark (&:where(.dark, .dark *));
-
 @theme {
   --font-cairo: "Cairo", sans-serif;
 
@@ -59,4 +56,29 @@ body {
     transform: translateZ(0);
     will-change: transform, opacity;
   }
+}
+
+/* Custom Animations for WhatsApp Button */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideInRight {
+  from { transform: translateX(0.5rem); }
+  to { transform: translateX(0); }
+}
+.animate-in {
+  animation-duration: 300ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
+.fade-in {
+  animation-name: fadeIn;
+}
+.slide-in-from-right-2 {
+  animation-name: slideInRight;
+}
+/* Allow combining animations */
+.animate-in.fade-in.slide-in-from-right-2 {
+  animation-name: fadeIn, slideInRight;
 }

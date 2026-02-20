@@ -23,3 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# WhatsApp Service
+whatsapp-service/auth_sessions/
+whatsapp-service/node_modules/

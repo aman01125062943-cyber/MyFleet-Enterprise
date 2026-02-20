@@ -257,6 +257,7 @@ export interface OrgSettings {
   logo_url?: string;
   address?: string;
   phone?: string;
+  support_number?: string;
   footer_text?: string;
   transaction_categories?: {
     income: { id: string, label: string }[];
@@ -361,13 +362,17 @@ export interface WhatsAppSession {
   waName?: string;
 }
 
+export type MessageStatus = 'sent' | 'failed' | 'pending';
+export type QueueStatus = MessageStatus | 'processing';
+export type NotificationType = 'trial_welcome' | 'paid_welcome' | 'expiry_reminder' | 'expiry_urgent';
+
 export interface WhatsAppMessage {
   id: string;
   session_id: string;
   recipient: string;
   content: string;
   type: 'text' | 'template';
-  status: 'sent' | 'failed' | 'pending';
+  status: MessageStatus;
   error_message?: string;
   sent_at?: string;
   created_at: string;
@@ -389,7 +394,7 @@ export interface NotificationQueue {
   recipient_phone: string;
   template_id?: string;
   variables?: Record<string, string>;
-  status: 'pending' | 'sent' | 'failed';
+  status: MessageStatus;
   scheduled_at?: string;
   sent_at?: string;
   error_message?: string;
@@ -398,11 +403,11 @@ export interface NotificationQueue {
 
 export interface WhatsAppNotificationLog {
   id: number;
-  notification_type: 'trial_welcome' | 'paid_welcome' | 'expiry_reminder' | 'expiry_urgent';
+  notification_type: NotificationType;
   org_id: string;
   user_id: string;
   phone_number: string;
-  status: 'pending' | 'sent' | 'failed';
+  status: MessageStatus;
   error_message?: string;
   sent_at?: string;
   created_at: string;
@@ -413,9 +418,9 @@ export interface WhatsAppNotificationQueue {
   org_id: string;
   user_id?: string;
   phone_number: string;
-  notification_type: 'trial_welcome' | 'paid_welcome' | 'expiry_reminder' | 'expiry_urgent';
+  notification_type: NotificationType;
   variables?: Record<string, string | number>;
-  status: 'pending' | 'processing' | 'sent' | 'failed';
+  status: QueueStatus;
   error_message?: string;
   retry_count: number;
   created_at: string;
