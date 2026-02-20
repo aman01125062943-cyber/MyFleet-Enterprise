@@ -148,7 +148,7 @@ export async function getHealthSummary(): Promise<HealthSummary | null> {
     const { data, error } = await supabase.rpc('get_system_health_summary');
 
     if (error) throw error;
-    return (data && data[0]) ? data[0] as HealthSummary : null;
+    return data?.[0] as HealthSummary ?? null;
   } catch (e) {
     console.error('Error fetching health summary:', e);
     return null;
@@ -163,7 +163,7 @@ export async function checkSystemHealth(): Promise<HealthCheckResult | null> {
     const { data, error } = await supabase.rpc('check_system_health');
 
     if (error) throw error;
-    return (data && data[0]) ? data[0] as HealthCheckResult : null;
+    return data?.[0] as HealthCheckResult ?? null;
   } catch (e) {
     console.error('Error checking system health:', e);
     return null;
@@ -389,20 +389,20 @@ export function isHealthMonitoringActive(): boolean {
 // Auto-start monitoring in production
 // =====================================================
 
-if (typeof window !== 'undefined') {
+if (typeof globalThis.window !== 'undefined') {
   // Only start monitoring if user is admin
-  supabase.auth.getSession().then(({ data: { session } }) => {
+  (async () => {
+    const { data: { session } } = await supabase.auth.getSession();
     if (session) {
-      supabase.from('profiles')
+      const { data } = await supabase.from('profiles')
         .select('role')
         .eq('id', session.user.id)
-        .single()
-        .then(({ data }) => {
-          if (data && (data.role === 'admin' || data.role === 'super_admin' || data.role === 'owner')) {
-            // Start monitoring for admin users
-            startHealthMonitoring();
-          }
-        });
+        .single();
+      
+      if (data && (data.role === 'admin' || data.role === 'super_admin' || data.role === 'owner')) {
+        // Start monitoring for admin users
+        startHealthMonitoring();
+      }
     }
-  });
+  })();
 }
