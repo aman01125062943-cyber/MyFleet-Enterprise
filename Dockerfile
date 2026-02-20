@@ -7,10 +7,10 @@ WORKDIR /app
 
 # Install dependencies for both root and whatsapp-service
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 COPY whatsapp-service/package*.json ./whatsapp-service/
-RUN cd whatsapp-service && npm ci
+RUN cd whatsapp-service && npm install
 
 # Copy source and build the frontend
 COPY . .
@@ -25,7 +25,7 @@ WORKDIR /app
 
 # Copy package files and install production dependencies
 COPY whatsapp-service/package*.json ./
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # Copy the built frontend from builder stage
 COPY --from=builder /app/dist ./dist
@@ -38,4 +38,5 @@ EXPOSE 3002
 
 # The server.js in whatsapp-service already serves ../dist
 CMD ["node", "server.js"]
+
 
