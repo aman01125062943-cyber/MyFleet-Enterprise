@@ -17,7 +17,7 @@ class MessageService {
             const session = this.sessionManager.getSession(sessionId);
 
             if (!session) {
-                throw new Error(`Session ${sessionId} not found in memory. Please connect WhatsApp first.`);
+                throw new Error(`Session ${sessionId} not found in memory. Server may have restarted - please reconnect WhatsApp.`);
             }
 
             if (!session.user) {
@@ -47,14 +47,18 @@ class MessageService {
             // Provide more helpful error messages
             let userMessage = error.message;
 
-            if (error.message.includes('401') || error.message.includes('loggedOut')) {
-                userMessage = 'WhatsApp session logged out. Please reconnect by scanning QR code.';
+            if (error.message.includes('not found in memory') || error.message.includes('may have restarted')) {
+                userMessage = '⚠️ انقطع اتصال WhatsApp بعد إعادة تشغيل السيرفر. يرجى الذهاب لإعدادات WhatsApp وإعادة مسح رمز QR.';
+            } else if (error.message.includes('not authenticated') || error.message.includes('scan QR')) {
+                userMessage = '⚠️ جلسة WhatsApp غير مفعّلة. يرجى مسح رمز QR من لوحة المشرف.';
+            } else if (error.message.includes('401') || error.message.includes('loggedOut')) {
+                userMessage = '⚠️ تم تسجيل الخروج من WhatsApp. يرجى إعادة تسجيل الدخول عبر مسح رمز QR.';
             } else if (error.message.includes('410') || error.message.includes('gone')) {
-                userMessage = 'Session expired. Please clear auth_sessions folder and reconnect.';
+                userMessage = '⚠️ انتهت صلاحية الجلسة. يرجى حذف مجلد الجلسات وإعادة الاتصال.';
             } else if (error.message.includes('timedout') || error.message.includes('timeout')) {
-                userMessage = 'Connection timed out. Check your internet connection.';
+                userMessage = '⚠️ انتهت مهلة الاتصال. تحقق من إنترنت السيرفر.';
             } else if (error.message.includes('ECONNREFUSED')) {
-                userMessage = 'Cannot connect to WhatsApp servers. Check your internet connection.';
+                userMessage = '⚠️ لا يمكن الاتصال بأبداء WhatsApp. تحقق من إنترنت السيرفر.';
             }
 
             // Log failed message
