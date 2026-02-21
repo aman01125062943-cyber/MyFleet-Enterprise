@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import compression from 'compression';
 import SessionManager from './SessionManager.js';
 import MessageService from './MessageService.js';
 import NotificationService from './NotificationService.js';
@@ -14,6 +15,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
+app.use(compression());
 const PORT = process.env.PORT || 3002;
 
 // Initialize Supabase client
@@ -1136,6 +1138,13 @@ app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) {
         return next();
     }
+
+    // Skip files with extensions (e.g., .js, .css, .webmanifest)
+    // If they reached here, it means express.static didn't find them and they should be 404
+    if (req.path.match(/\.[^/]+$/)) {
+        return res.status(404).send('Not Found');
+    }
+
     res.sendFile(path.join(distPath, 'index.html'));
 });
 
