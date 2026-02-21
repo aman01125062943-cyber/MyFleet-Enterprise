@@ -85,7 +85,14 @@ const WhatsAppSection: React.FC = () => {
         });
 
         if (!response.ok) {
-            throw new Error(`API Error: ${response.statusText}`);
+            let errorMessage = `${response.status}`;
+            try {
+                const errData = await response.json();
+                errorMessage = errData.error || errData.message || errData.hint || errorMessage;
+            } catch {
+                errorMessage = response.statusText || errorMessage;
+            }
+            throw new Error(`API Error: ${errorMessage}`);
         }
 
         return response.json();
@@ -105,10 +112,16 @@ const WhatsAppSection: React.FC = () => {
 
         if (!response.ok) {
             if (response.status === 404) {
-                // Session might not be ready yet, return a specific response
                 return { success: false, status: 'not_ready', message: 'Session initializing' };
             }
-            throw new Error(`API Error: ${response.statusText}`);
+            let errorMessage = `${response.status}`;
+            try {
+                const errData = await response.json();
+                errorMessage = errData.error || errData.message || errData.hint || errorMessage;
+            } catch {
+                errorMessage = response.statusText || errorMessage;
+            }
+            throw new Error(`API Error: ${errorMessage}`);
         }
 
         return response.json();
