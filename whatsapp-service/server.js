@@ -137,7 +137,7 @@ async function authenticateJWT(req, res, next) {
 
     } catch (error) {
         console.error('[Auth] Authentication failed:', error);
-        return res.status(401).json({ error: 'Authentication failed' });
+        return res.status(401).json({ error: 'Authentication failed', details: error.message });
     }
 }
 
@@ -508,7 +508,11 @@ app.post('/api/sessions/init', authenticateJWT, async (req, res) => {
         });
     } catch (error) {
         console.error('[Init] Error:', error);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+            context: 'Failed to initialize session'
+        });
     }
 });
 
