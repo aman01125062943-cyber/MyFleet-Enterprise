@@ -3,3 +3,5 @@ dist
 .git
 .env
 .DS_Store
+auth_sessions/
+whatsapp-service/auth_sessions/
