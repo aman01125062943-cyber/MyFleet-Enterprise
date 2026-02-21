@@ -5,6 +5,11 @@ services:
     region: frankfurt
     plan: free
     branch: main
+    dockerBuildArgs:
+      - key: VITE_SUPABASE_URL
+        value: https://necqtqhmnmcsjxcxgeff.supabase.co
+      - key: VITE_SUPABASE_ANON_KEY
+        fromEnv: VITE_SUPABASE_ANON_KEY
     envVars:
       - key: SUPABASE_URL
         value: https://necqtqhmnmcsjxcxgeff.supabase.co

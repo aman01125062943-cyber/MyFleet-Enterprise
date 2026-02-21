@@ -15,8 +15,17 @@ RUN npm install
 COPY whatsapp-service/package*.json ./whatsapp-service/
 RUN cd whatsapp-service && npm install
 
-# Copy source and build the frontend
+# Copy source and prepare for build
 COPY . .
+
+# Accept Supabase environment variables for Vite build
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+
+# Set them as ENV variables during build
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+
 RUN npm run build
 
 # ===========================================
