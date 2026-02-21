@@ -37,6 +37,22 @@ interface QRResponse {
 }
 
 // ============================================================================
+// HELPERS
+// ============================================================================
+
+const getStatusDotColor = (status: string): string => {
+    if (status === 'connected') return 'bg-emerald-500';
+    if (status === 'connecting') return 'bg-yellow-500';
+    return 'bg-slate-500';
+};
+
+const getStatusText = (status: string): string => {
+    if (status === 'connected') return 'متصل';
+    if (status === 'connecting') return 'جاري الاتصال';
+    return 'غير متصل';
+};
+
+// ============================================================================
 // COMPONENT
 // ============================================================================
 
@@ -523,21 +539,14 @@ const WhatsAppSection: React.FC = () => {
                                             >
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-3">
-                                                        <div className={`w-3 h-3 rounded-full ${s.status === 'connected' ? 'bg-emerald-500' :
-                                                            s.status === 'connecting' ? 'bg-yellow-500' :
-                                                                'bg-slate-500'
-                                                            }`} />
+                                                        <div className={`w-3 h-3 rounded-full ${getStatusDotColor(s.status)}`} />
                                                         <div>
                                                             <p className="text-white font-medium">
                                                                 {s.display_name || SYSTEM_SESSION_NAME}
                                                                 {s.id === session?.id && ' (الجلسة الرئيسية)'}
                                                             </p>
                                                             <p className="text-slate-400 text-sm">
-                                                                الحالة: {
-                                                                    s.status === 'connected' ? 'متصل' :
-                                                                        s.status === 'connecting' ? 'جاري الاتصال' :
-                                                                            'غير متصل'
-                                                                }
+                                                                الحالة: {getStatusText(s.status)}
                                                                 {s.phone_number && ` • ${s.phone_number}`}
                                                             </p>
                                                         </div>
@@ -550,7 +559,8 @@ const WhatsAppSection: React.FC = () => {
                                                                 try {
                                                                     await apiCall(`/api/sessions/${s.id}`, { method: 'DELETE' });
                                                                     await fetchSession();
-                                                                } catch (err) {
+                                                                } catch (deleteError) {
+                                                                    console.error('Error deleting old session:', deleteError);
                                                                     alert('فشل في حذف الجلسة');
                                                                 }
                                                             }
