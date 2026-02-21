@@ -658,8 +658,16 @@ app.post('/api/messages/send', rateLimit(60000, 10), authenticateJWT, async (req
             .eq('id', sessionId)
             .single();
 
-        if (!session || (req.user.role !== 'super_admin' && session.org_id !== req.user.org_id)) {
-            return res.status(403).json({ error: 'Session not found or access denied' });
+        // ✅ السماح للجلسات system-wide (org_id=null) أو التحقق من المنظمة
+        if (!session) {
+            return res.status(404).json({ error: 'Session not found in database' });
+        }
+
+        // super_admin يمكنه استخدام أي جلسة، والآخرون فقط جلسات system-wide أو منظمتهم
+        const isSystemSession = session.org_id === null;
+        const isSameOrg = session.org_id === req.user.org_id;
+        if (req.user.role !== 'super_admin' && !isSystemSession && !isSameOrg) {
+            return res.status(403).json({ error: 'Session access denied' });
         }
 
         let result;
@@ -681,7 +689,15 @@ app.post('/api/messages/send', rateLimit(60000, 10), authenticateJWT, async (req
             result
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('[API] Send message error:', error.message);
+        res.status(500).json({
+            error: error.message || 'Failed to send message',
+            hint: error.message?.includes('not found in memory') || error.message?.includes('may have restarted')
+                ? 'WhatsApp session lost. Please reconnect by scanning QR code.'
+                : error.message?.includes('not authenticated')
+                    ? 'WhatsApp not authenticated. Please reconnect.'
+                    : 'Internal server error'
+        });
     }
 });
 

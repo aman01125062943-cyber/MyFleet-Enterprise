@@ -19,7 +19,7 @@ import type { UserPermissions, PlanFeatures, Plan } from './types';
  * لا يمكن للمستخدم تجاوز هذه الصلاحيات مهما كانت صلاحياته المحددة
  */
 export const PLAN_MAX_PERMISSIONS: Record<string, UserPermissions> = {
-  // باقة تجريبية - كل الصلاحيات مفتوحة
+  // باقة تجريبية - صلاحيات أساسية (بدون إدارة الخطط والخصومات)
   trial: {
     dashboard: { view: true },
     inventory: { view: true, add: true, edit: true, delete: true, manage_status: true },
@@ -29,12 +29,31 @@ export const PLAN_MAX_PERMISSIONS: Record<string, UserPermissions> = {
     reports: { view: true },
     subscription: {
       view_requests: true,
-      approve_requests: true,
-      reject_requests: true,
-      manage_plans: true,
-      manage_discounts: true,
-      view_reports: true,
-      manage_notifications: true
+      approve_requests: false,
+      reject_requests: false,
+      manage_plans: false,
+      manage_discounts: false,
+      view_reports: false,
+      manage_notifications: false
+    }
+  },
+
+  // باقة منتهية - صفر صلاحيات (ماعدا الاشتراك للتجديد)
+  expired: {
+    dashboard: { view: false },
+    inventory: { view: false, add: false, edit: false, delete: false, manage_status: false },
+    assets: { view: false, add: false, edit: false, delete: false },
+    finance: { view: false, add_income: false, add_expense: false, export: false },
+    team: { view: false, manage: false },
+    reports: { view: false },
+    subscription: {
+      view_requests: true,
+      approve_requests: false,
+      reject_requests: false,
+      manage_plans: false,
+      manage_discounts: false,
+      view_reports: false,
+      manage_notifications: false
     }
   },
 
@@ -405,7 +424,7 @@ export function generatePermissionAuditReport(
 /**
  * قائمة بأسماء الباقات المدعومة
  */
-export const SUPPORTED_PLANS = ['trial', 'starter', 'pro', 'business'] as const;
+export const SUPPORTED_PLANS = ['trial', 'starter', 'pro', 'business', 'expired'] as const;
 export type SupportedPlan = typeof SUPPORTED_PLANS[number];
 
 /**
@@ -422,5 +441,6 @@ export const PLAN_NAMES_AR: Record<SupportedPlan, string> = {
   trial: 'تجريبي',
   starter: 'بداية',
   pro: 'محترف',
-  business: 'أعمال'
+  business: 'أعمال',
+  expired: 'منتهي'
 };
