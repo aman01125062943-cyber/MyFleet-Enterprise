@@ -37,8 +37,8 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install git even in production if needed by any runtime dependencies
-RUN apk add --no-cache git
+# Install git and build tools needed for native dependencies (like libsignal)
+RUN apk add --no-cache git python3 make g++
 
 # Copy the built frontend from builder stage
 COPY --from=builder /app/dist ./dist
