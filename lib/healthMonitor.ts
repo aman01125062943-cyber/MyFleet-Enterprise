@@ -55,7 +55,8 @@ export interface HealthSummary {
 // Configuration
 const HEALTH_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const isDev = import.meta.env.DEV;
-const WHATSAPP_SERVER_URL = import.meta.env.VITE_WHATSAPP_SERVER_URL || (isDev ? 'http://localhost:3002' : '');
+// Unified: prefer VITE_WHATSAPP_SERVICE_URL (used by WhatsAppSection), fallback to VITE_WHATSAPP_SERVER_URL
+const WHATSAPP_SERVER_URL = import.meta.env.VITE_WHATSAPP_SERVICE_URL || import.meta.env.VITE_WHATSAPP_SERVER_URL || '';
 const WHATSAPP_ENABLED = import.meta.env.VITE_WHATSAPP_ENABLED !== 'false'; // Default: enabled
 
 let monitoringInterval: ReturnType<typeof setInterval> | null = null;
@@ -185,7 +186,7 @@ async function checkWhatsAppHealth(): Promise<void> {
   }
 
   try {
-    const response = await fetch(`${WHATSAPP_SERVER_URL}/health`);
+    const response = await fetch(`${WHATSAPP_SERVER_URL}/api/health`);
 
     if (!response.ok) {
       if (response.status >= 500) {
@@ -398,7 +399,7 @@ if (typeof globalThis.window !== 'undefined') {
         .select('role')
         .eq('id', session.user.id)
         .single();
-      
+
       if (data && (data.role === 'admin' || data.role === 'super_admin' || data.role === 'owner')) {
         // Start monitoring for admin users
         startHealthMonitoring();

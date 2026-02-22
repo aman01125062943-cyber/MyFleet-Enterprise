@@ -41,6 +41,7 @@ notificationScheduler.init();
 // Middleware
 const allowedOrigins = new Set([
     'http://localhost:5173',
+    'http://localhost:4173',
     'http://localhost:3002',
     process.env.FRONTEND_URL,
     'https://myfleet-pro.onrender.com'
@@ -144,7 +145,7 @@ async function authenticateJWT(req, res, next) {
 // ==================== API ROUTES ====================
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/api/health', (req, res) => {
     res.json({
         status: 'ok',
         timestamp: new Date().toISOString(),
@@ -260,12 +261,12 @@ app.get('/api/sessions', authenticateJWT, async (req, res) => {
 
         const result = (sessions || []).map(session => {
             const active = activeMap.get(session.id);
-            const isConnected = active ? active.connected : session.status === 'connected';
+            const isActuallyConnected = active ? active.connected : false;
 
             return {
                 ...session,
-                connected: isConnected,
-                status: isConnected ? 'connected' : session.status,
+                connected: !!isActuallyConnected,
+                status: isActuallyConnected ? 'connected' : (active ? 'connecting' : (session.status === 'connected' ? 'disconnected' : session.status)),
                 phoneNumber: active?.phoneNumber || session.phone_number,
                 waName: active?.name
             };
@@ -690,13 +691,19 @@ app.post('/api/messages/send', rateLimit(60000, 10), authenticateJWT, async (req
         });
     } catch (error) {
         console.error('[API] Send message error:', error.message);
+
+        // If error message is already in Arabic (from MessageService), use it as is
+        const isArabic = /[\u0600-\u06FF]/.test(error.message);
+
         res.status(500).json({
             error: error.message || 'Failed to send message',
-            hint: error.message?.includes('not found in memory') || error.message?.includes('may have restarted')
-                ? 'WhatsApp session lost. Please reconnect by scanning QR code.'
-                : error.message?.includes('not authenticated')
-                    ? 'WhatsApp not authenticated. Please reconnect.'
-                    : 'Internal server error'
+            hint: isArabic ? null : (
+                error.message?.includes('not found in memory') || error.message?.includes('may have restarted')
+                    ? 'WhatsApp session lost. Please reconnect by scanning QR code.'
+                    : error.message?.includes('not authenticated')
+                        ? 'WhatsApp not authenticated. Please reconnect.'
+                        : 'Internal server error'
+            )
         });
     }
 });

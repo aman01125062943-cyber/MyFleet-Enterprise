@@ -7,7 +7,8 @@
     "dev": "concurrently \"vite\" \"cd whatsapp-service && npm run dev\"",
     "start": "cd whatsapp-service && npm start",
     "build": "vite build && cd whatsapp-service && npm install",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:browser": "node test-admin-with-playwright.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

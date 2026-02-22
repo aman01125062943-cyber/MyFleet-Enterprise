@@ -18,7 +18,7 @@ interface CampaignStatus {
 }
 interface WhatsAppCampaignManagerProps {
     sessionId: string;
-    apiCall: (endpoint: string, options?: globalThis.RequestInit) => Promise<{ success: boolean; results?: any; result?: any; error?: string }>;
+    apiCall: (endpoint: string, options?: globalThis.RequestInit) => Promise<{ success: boolean; results?: unknown; result?: unknown; error?: string }>;
 }
 
 export const WhatsAppCampaignManager: React.FC<WhatsAppCampaignManagerProps> = ({ sessionId, apiCall }) => {
@@ -199,9 +199,10 @@ export const WhatsAppCampaignManager: React.FC<WhatsAppCampaignManagerProps> = (
             } else {
                 alert('فشل الإرسال: ' + (result?.error || 'خطأ غير معروف'));
             }
-        } catch (err) {
-            console.error(err);
-            alert('حدث خطأ أثناء الإرسال');
+        } catch (err: unknown) {
+            const error = err as Error;
+            console.error(error);
+            alert(error.message || 'حدث خطأ أثناء الإرسال');
         } finally {
             setSendingSingle(false);
         }
@@ -292,8 +293,15 @@ export const WhatsAppCampaignManager: React.FC<WhatsAppCampaignManagerProps> = (
                         <label className="block">
                             <span className="text-sm text-slate-400 block mb-2">عرض العملاء الذين ينتهي اشتراكهم خلال:</span>
                             <select
-                                value={filterDays}
-                                onChange={(e) => setFilterDays(Number(e.target.value))}
+                                value={[7, 15, 20, 30, 90].includes(filterDays) ? filterDays : 'custom'}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === 'custom') {
+                                        setFilterDays(45); // Default for custom if not set
+                                    } else {
+                                        setFilterDays(Number(val));
+                                    }
+                                }}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                             >
                                 <option value={7}>7 أيام</option>
@@ -301,8 +309,23 @@ export const WhatsAppCampaignManager: React.FC<WhatsAppCampaignManagerProps> = (
                                 <option value={20}>20 يوم</option>
                                 <option value={30}>30 يوم (شهر)</option>
                                 <option value={90}>3 شهور</option>
+                                <option value="custom">مخصص (عدد أيام محدد)...</option>
                             </select>
                         </label>
+
+                        {![7, 15, 20, 30, 90].includes(filterDays) && (
+                            <div className="animate-in slide-in-from-top-2 fade-in duration-200">
+                                <label className="block text-xs text-slate-500 mb-1 mr-1">أدخل عدد الأيام:</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="365"
+                                    value={filterDays}
+                                    onChange={(e) => setFilterDays(Number(e.target.value))}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white focus:ring-1 focus:ring-blue-500/50 outline-none"
+                                />
+                            </div>
+                        )}
 
                         <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/30">
                             <p className="text-xs text-slate-400">
@@ -365,22 +388,26 @@ export const WhatsAppCampaignManager: React.FC<WhatsAppCampaignManagerProps> = (
                         <label className="block text-sm text-slate-400 mb-2">الحد الأدنى للتأخير (ثواني)</label>
                         <input
                             type="number"
-                            min="1"
+                            inputMode="numeric"
+                            min={1}
                             value={minDelay}
                             onChange={(e) => setMinDelay(Number(e.target.value))}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white"
-                            style={{ direction: 'ltr' }}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white font-[inherit]"
+                            style={{ direction: 'ltr', fontVariantNumeric: 'tabular-nums' }}
+                            lang="en"
                         />
                     </div>
                     <div>
                         <label className="block text-sm text-slate-400 mb-2">الحد الأقصى للتأخير (ثواني)</label>
                         <input
                             type="number"
-                            min="2"
+                            inputMode="numeric"
+                            min={2}
                             value={maxDelay}
                             onChange={(e) => setMaxDelay(Number(e.target.value))}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white"
-                            style={{ direction: 'ltr' }}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white font-[inherit]"
+                            style={{ direction: 'ltr', fontVariantNumeric: 'tabular-nums' }}
+                            lang="en"
                         />
                     </div>
                 </div>

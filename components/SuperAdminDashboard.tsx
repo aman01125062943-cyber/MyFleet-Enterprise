@@ -4,8 +4,6 @@ import React, { useState, useEffect } from 'react';
 import AnalyticsDashboard from './AnalyticsDashboard';
 import { UpdateBanner } from './UpdateBanner';
 
-console.log("🚀 Admin Dashboard v8 - Mobile Cards Added - Loaded Successfully! (Check 2026-02-07 00:30)");
-
 import { Profile, Organization, SystemConfig, Plan, AuditLog, UserPermissions, PlanFeatures, DiscountCode, PaymentRequest } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
@@ -445,15 +443,15 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({ stats, loading }) => 
  * @returns Secure secret key in format: sk_live_{orgPart}_{randomPart}
  */
 const generateSecretKey = (orgId: string): string => {
-  // Remove dashes and take first 12 characters of org ID
-  const orgPart = orgId.replaceAll('-', '').substring(0, 12);
+    // Remove dashes and take first 12 characters of org ID
+    const orgPart = orgId.replaceAll('-', '').substring(0, 12);
 
-  // Generate 16 random bytes (32 hex characters) for the secret part
-  const randomPart = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
+    // Generate 16 random bytes (32 hex characters) for the secret part
+    const randomPart = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
 
-  return `sk_live_${orgPart}_${randomPart}`;
+    return `sk_live_${orgPart}_${randomPart}`;
 };
 
 // ==================== ORGANIZATIONS SECTION ====================
@@ -1818,9 +1816,7 @@ const AnnouncementsSection: React.FC = () => {
 
         const { error } = await supabase.from('public_config').update({
             announcement_data: payload,
-            show_announcement: data.show,
-            grace_period_days: config?.grace_period_days || 7,
-            grace_period_allowed_modules: config?.grace_period_allowed_modules || ['inventory']
+            show_announcement: data.show
         }).eq('id', 1);
 
         setLoading(false);
@@ -1894,77 +1890,16 @@ const AnnouncementsSection: React.FC = () => {
                     />
                 </div>
 
-                <div>
-                    <div>
-                        <h4 className="block text-sm font-bold text-slate-300 mb-2">إعدادات فترة السماح (Grace Period)</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-900/40 p-4 rounded-xl border border-slate-800">
-                            <div>
-                                <label htmlFor="grace-period-days" className="text-xs text-slate-400 block mb-1">عدد أيام السماح</label>
-                                <input id="grace-period-days" type="number"
-                                    value={config?.grace_period_days || 7}
-                                    onChange={e => {
-                                        if (config) setConfig({ ...config, grace_period_days: Number.parseInt(e.target.value, 10) } as SystemConfig);
-                                    }}
-                                    className="w-full bg-[#0f172a] border border-slate-700 rounded-lg p-2 text-white outline-none focus:border-blue-500" />
-                            </div>
-                            <div>
-                                <label htmlFor="grace-period-allowed-modules-field" id="modules-label" className="text-xs text-slate-400 block mb-1">الموديولات المسموحة (Inventory فقط افتراضياً)</label>
-                                <fieldset id="grace-period-allowed-modules-field" className="flex flex-wrap gap-2 mt-1" aria-labelledby="modules-label">
-                                    {(['inventory', 'finance', 'team', 'assets', 'reports'] as (Extract<keyof UserPermissions, string>)[]).map(mod => (
-                                        <button key={mod}
-                                            type="button"
-                                            onClick={() => {
-                                                const current = (config as SystemConfig)?.grace_period_allowed_modules || ['inventory'];
-                                                const updated = (current as string[]).includes(mod)
-                                                    ? (current as string[]).filter((m) => m !== mod)
-                                                    : [...current, mod];
-                                                if (config) setConfig({ ...config, grace_period_allowed_modules: updated as (keyof UserPermissions)[] });
-                                            }}
-                                            className={`px-3 py-1 rounded-full text-[10px] font-bold transition ${((config as SystemConfig)?.grace_period_allowed_modules || ['inventory'] as (keyof UserPermissions)[] as string[])?.includes(mod) ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500'}`}
-                                        >
-                                            {mod}
-                                        </button>
-                                    ))}
-                                </fieldset>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h4 id="target-plans-label" className="block text-sm font-bold text-slate-300 mb-2">الباقات المستهدفة</h4>
-                        <fieldset className="flex flex-wrap gap-3" aria-labelledby="target-plans-label">
-                            {[
-                                { id: 'pro', label: 'المحترف (Pro)' },
-                                { id: 'starter', label: 'البداية (Starter)' },
-                                { id: 'trial', label: 'التجريبية (Trial)' },
-                            ].map(plan => (
-                                <button
-                                    key={plan.id}
-                                    type="button"
-                                    onClick={() => togglePlan(plan.id)}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${data.target_plans.includes(plan.id)
-                                        ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
-                                        : 'text-slate-400 hover:bg-slate-800'
-                                        } `}
-                                >
-                                    {plan.label}
-                                </button>
-                            ))}
-                        </fieldset>
-                        <p className="text-xs text-slate-500 mt-2">* اترك الكل غير محدد لإظهار الإعلان للجميع</p>
-                    </div>
-
-                    <button
-                        onClick={handleSave}
-                        disabled={loading}
-                        className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition shadow-lg shadow-blue-500/20"
-                    >
-                        {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <Save className="w-5 h-5" />}
-                        حفظ ونشر الإعلان والإعدادات
-                    </button>
-                </div>
+                <button
+                    onClick={handleSave}
+                    disabled={loading}
+                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition shadow-lg shadow-blue-500/20"
+                >
+                    {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <Save className="w-5 h-5" />}
+                    حفظ ونشر الإعلان
+                </button>
             </div>
-        </div >
+        </div>
     );
 };
 
@@ -1987,10 +1922,12 @@ const PlansSection: React.FC = () => {
         price_yearly: 0,
         interval: 'monthly',
         features: {
-            reports: false, export: false, priority_support: false, max_users: 1, max_cars: 1,
+            reports: false, export: false, priority_support: false,
             inventory: false, finance: false, team: false, maintenance: false, assets: false,
             advanced_reports: false, alerts: false
         },
+        max_cars: 5,
+        max_users: 2,
         is_active: true,
         sort_order: 0
     };
@@ -2021,9 +1958,13 @@ const PlansSection: React.FC = () => {
             description_ar: plan.description_ar,
             price_monthly: plan.price_monthly,
             price_yearly: plan.price_yearly,
-            max_cars: plan.features.max_cars,
-            max_users: plan.features.max_users,
-            features: plan.features, // JSONB
+            max_cars: plan.max_cars || 0,
+            max_users: plan.max_users || 0,
+            features: {
+                ...plan.features,
+                max_cars: plan.max_cars,
+                max_users: plan.max_users
+            }, // JSONB Sync
             is_active: plan.is_active,
             sort_order: plan.sort_order,
             updated_at: new Date().toISOString()
@@ -2101,11 +2042,11 @@ const PlansSection: React.FC = () => {
                             <div className="space-y-2 mb-4">
                                 <div className="text-sm text-slate-300 flex items-center gap-2">
                                     <Car className="w-4 h-4 text-slate-500" />
-                                    <span>{plan.features.max_cars === 9999 ? 'سيارات غير محدودة' : `${plan.features.max_cars} سيارة`}</span>
+                                    <span>{(plan.max_cars ?? plan.features?.max_cars) === 9999 ? 'سيارات غير محدودة' : `${plan.max_cars ?? plan.features?.max_cars ?? 0} سيارة`}</span>
                                 </div>
                                 <div className="text-sm text-slate-300 flex items-center gap-2">
                                     <Users className="w-4 h-4 text-slate-500" />
-                                    <span>{plan.features.max_users === 9999 ? 'مستخدمين غير محدودين' : `${plan.features.max_users} مستخدم`}</span>
+                                    <span>{(plan.max_users ?? plan.features?.max_users) === 9999 ? 'مستخدمين غير محدودين' : `${plan.max_users ?? plan.features?.max_users ?? 0} مستخدم`}</span>
                                 </div>
                             </div>
 
@@ -2182,11 +2123,11 @@ const PlanEditModal: React.FC<{ plan: Plan, onClose: () => void, onSave: (p: Pla
                     </div>
                     <div>
                         <label htmlFor="plan-max-cars" className="block text-sm text-slate-400 mb-1">السيارات</label>
-                        <input id="plan-max-cars" type="number" value={formData.features.max_cars} onChange={e => setFormData({ ...formData, features: { ...formData.features, max_cars: Number(e.target.value) } })} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white" />
+                        <input id="plan-max-cars" type="number" value={formData.max_cars ?? 0} onChange={e => setFormData({ ...formData, max_cars: Number(e.target.value) })} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white" />
                     </div>
                     <div>
                         <label htmlFor="plan-max-users" className="block text-sm text-slate-400 mb-1">المستخدمين</label>
-                        <input id="plan-max-users" type="number" value={formData.features.max_users} onChange={e => setFormData({ ...formData, features: { ...formData.features, max_users: Number(e.target.value) } })} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white" />
+                        <input id="plan-max-users" type="number" value={formData.max_users ?? 0} onChange={e => setFormData({ ...formData, max_users: Number(e.target.value) })} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white" />
                     </div>
                     <div>
                         <label htmlFor="plan-sort" className="block text-sm text-slate-400 mb-1">ترتيب العرض</label>
@@ -2408,7 +2349,55 @@ const SystemSettingsSection: React.FC = () => {
                 </div>
             </div>
 
-            {/* System Settings */}
+            {/* Grace Period Settings */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-orange-500" />
+                    إعدادات فترة السماح (Grace Period)
+                </h3>
+                <div className="space-y-4 max-w-xl">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-800/40 p-5 rounded-xl border border-slate-700">
+                        <div>
+                            <label htmlFor="grace-period-days" className="text-xs text-slate-400 block mb-2 font-bold uppercase tracking-wider">عدد أيام السماح</label>
+                            <input id="grace-period-days" type="number"
+                                value={config?.grace_period_days || 7}
+                                onChange={e => {
+                                    if (config) setConfig({ ...config, grace_period_days: Number.parseInt(e.target.value, 10) } as SystemConfig);
+                                }}
+                                className="w-full bg-[#0f172a] border border-slate-700 rounded-lg p-2.5 text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50" />
+                            <p className="text-[10px] text-slate-500 mt-2">الأيام التي يمكن للعميل استخدام موديولات محددة فيها بعد انتهاء صلاحية باقته.</p>
+                        </div>
+                        <div>
+                            <label className="text-xs text-slate-400 block mb-2 font-bold uppercase tracking-wider">الموديولات المسموحة</label>
+                            <div className="flex flex-wrap gap-2">
+                                {([
+                                    { id: 'inventory', name: '📦 المخزون' },
+                                    { id: 'finance', name: '💰 المالية' },
+                                    { id: 'team', name: '👥 الفريق' },
+                                    { id: 'assets', name: '🏠 الأصول' },
+                                    { id: 'reports', name: '📊 التقارير' }
+                                ]).map(mod => (
+                                    <button key={mod.id}
+                                        type="button"
+                                        onClick={() => {
+                                            const current = (config as SystemConfig)?.grace_period_allowed_modules || ['inventory'];
+                                            const updated = (current as string[]).includes(mod.id)
+                                                ? (current as string[]).filter((m) => m !== mod.id)
+                                                : [...current, mod.id];
+                                            if (config) setConfig({ ...config, grace_period_allowed_modules: updated as (keyof UserPermissions)[] });
+                                        }}
+                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${((config as SystemConfig)?.grace_period_allowed_modules || ['inventory'] as (keyof UserPermissions)[] as string[])?.includes(mod.id) ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-800 text-slate-500 hover:bg-slate-750'}`}
+                                    >
+                                        {mod.name}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* General System Settings */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
                 <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
                     <Settings className="w-5 h-5 text-purple-500" />

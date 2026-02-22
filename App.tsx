@@ -134,9 +134,9 @@ const validateAndNavigateUser = (user: any, config: any, navigate: any) => {
 
   // MAINTENANCE MODE: Block non-admin users
   if (config.maintenance_mode &&
-      user.role !== 'admin' &&
-      user.role !== 'super_admin' &&
-      user.role !== 'owner') {
+    user.role !== 'admin' &&
+    user.role !== 'super_admin' &&
+    user.role !== 'owner') {
     console.warn('🔧 Maintenance mode active, blocking non-admin user');
     navigate('/maintenance', { replace: true });
     return true; // Handled (redirected)
@@ -170,7 +170,7 @@ const checkCachedSession = async () => {
             .select('role, org_id, status')
             .eq('id', session.user.id)
             .maybeSingle();
-          
+
           return profile;
         }
       }
@@ -201,7 +201,7 @@ const checkOnlineSession = async () => {
           .select('role, org_id, status, full_name, email, username, permissions')
           .eq('id', session.user.id)
           .maybeSingle();
-        
+
         return user;
       }
     } catch (e) {
@@ -227,9 +227,9 @@ const checkOfflineSession = async (config: any, navigate: any) => {
 
         // MAINTENANCE MODE: Check offline session too
         if (config.maintenance_mode &&
-            s.role !== 'admin' &&
-            s.role !== 'super_admin' &&
-            s.role !== 'owner') {
+          s.role !== 'admin' &&
+          s.role !== 'super_admin' &&
+          s.role !== 'owner') {
           console.warn('🔧 Maintenance mode active, blocking offline non-admin user');
           navigate('/maintenance', { replace: true });
           return true;

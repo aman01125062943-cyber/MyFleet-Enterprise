@@ -176,6 +176,8 @@ export interface Plan {
   is_featured?: boolean;
   interval: 'monthly' | 'yearly';
   duration_days?: number;
+  max_cars?: number;
+  max_users?: number;
   features: PlanFeatures;
   is_trial?: boolean;
   is_active?: boolean;

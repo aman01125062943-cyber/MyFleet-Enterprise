@@ -235,8 +235,8 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({ children, requiredRole =
         }
 
         // Check role-based access
-        // super_admin has access to all admin routes
-        const hasRequiredRole = profile.role === requiredRole || profile.role === 'super_admin';
+        // super_admin and owner have access to all admin routes (aligned with SuperAdminDashboard)
+        const hasRequiredRole = profile.role === requiredRole || profile.role === 'super_admin' || profile.role === 'owner';
 
         if (isMounted) {
           setValidation({

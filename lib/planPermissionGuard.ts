@@ -8,11 +8,36 @@
  * Purpose: Enforce plan-based permission limits across the entire system
  */
 
-import type { UserPermissions, PlanFeatures, Plan } from './types';
+import type { UserPermissions, PlanFeatures } from '../types';
+
+type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
 
 // ============================================
 // 1. خريطة الصلاحيات المسموحة لكل باقة
 // ============================================
+
+/**
+ * الصلاحيات الفارغة (كل شيء معطل)
+ */
+export const EMPTY_PERMISSIONS: UserPermissions = {
+  dashboard: { view: false },
+  inventory: { view: false, add: false, edit: false, delete: false, manage_status: false },
+  assets: { view: false, add: false, edit: false, delete: false },
+  finance: { view: false, add_income: false, add_expense: false, export: false },
+  team: { view: false, manage: false },
+  reports: { view: false },
+  subscription: {
+    view_requests: false,
+    approve_requests: false,
+    reject_requests: false,
+    manage_plans: false,
+    manage_discounts: false,
+    view_reports: false,
+    manage_notifications: false
+  }
+};
 
 /**
  * الصلاحيات القصوى المسموحة لكل باقة
@@ -61,7 +86,7 @@ export const PLAN_MAX_PERMISSIONS: Record<string, UserPermissions> = {
   starter: {
     dashboard: { view: true },
     inventory: { view: true, add: true, edit: false, delete: false, manage_status: false },
-    assets: { view: false, add: false, edit: false, delete: false },
+    assets: { view: true, add: true, edit: false, delete: false },
     finance: { view: true, add_income: true, add_expense: true, export: false },
     team: { view: false, manage: false },
     reports: { view: false },
@@ -80,7 +105,7 @@ export const PLAN_MAX_PERMISSIONS: Record<string, UserPermissions> = {
   pro: {
     dashboard: { view: true },
     inventory: { view: true, add: true, edit: true, delete: false, manage_status: true },
-    assets: { view: false, add: false, edit: false, delete: false },
+    assets: { view: true, add: true, edit: true, delete: true },
     finance: { view: true, add_income: true, add_expense: true, export: false },
     team: { view: true, manage: false },
     reports: { view: true },
@@ -119,7 +144,7 @@ export const PLAN_MAX_PERMISSIONS: Record<string, UserPermissions> = {
  * خريطة الميزات (Features) للصلاحيات
  * تربط ميزات الباقة بالصلاحيات المسموحة
  */
-export const FEATURE_TO_PERMISSIONS: Record<keyof PlanFeatures, Partial<UserPermissions>> = {
+export const FEATURE_TO_PERMISSIONS: Record<keyof PlanFeatures, DeepPartial<UserPermissions>> = {
   // التقارير
   reports: {
     reports: { view: true }
@@ -129,7 +154,7 @@ export const FEATURE_TO_PERMISSIONS: Record<keyof PlanFeatures, Partial<UserPerm
     finance: { export: true }
   },
   // دعم الأولوية
-  priority_support: {} as any, // لا يوجد صلاحية محددة له
+  priority_support: {}, // لا يوجد صلاحية محددة له
   // المخزون
   inventory: {
     inventory: { view: true, add: true, edit: true, delete: true, manage_status: true }
@@ -155,7 +180,7 @@ export const FEATURE_TO_PERMISSIONS: Record<keyof PlanFeatures, Partial<UserPerm
     reports: { view: true }
   },
   // التنبيهات
-  alerts: {} as any // لا يوجد صلاحية محددة له
+  alerts: {} // لا يوجد صلاحية محددة له
 };
 
 // ============================================
@@ -201,26 +226,27 @@ export function sanitizePermissionsByPlan(
   planId: string
 ): UserPermissions {
   const maxPermissions = PLAN_MAX_PERMISSIONS[planId] || PLAN_MAX_PERMISSIONS.trial;
-  const sanitized: UserPermissions = {} as any;
+  const sanitized: UserPermissions = { ...EMPTY_PERMISSIONS };
 
   // نسخ الصلاحيات مع ضمان عدم تجاوز حدود الباقة
   for (const module in maxPermissions) {
     if (!userPermissions[module]) {
-      // إذا لم تكن الصلاحية موجودة للمستخدم، نعطي القيم الافتراضية
+      // إذا لم تكن الصلاحية موجودة للمسبوع، نعطي القيم الافتراضية للوحدة من الباقة
       sanitized[module] = { ...maxPermissions[module] };
       continue;
     }
 
-    sanitized[module] = {} as any;
+    const modulePermissions: Record<string, boolean> = {};
+    const maxModule = maxPermissions[module];
 
-    for (const action in maxPermissions[module]) {
-      // القاعدة: المستخدم لا يمكن أن يكون أعلى من الباقة
-      // userPermission = AND(userPermission, planPermission)
-      const userValue = userPermissions[module]?.[action] ?? false;
-      const planValue = maxPermissions[module]?.[action] ?? false;
-
-      sanitized[module][action] = userValue && planValue;
+    if (maxModule) {
+      for (const action in maxModule) {
+        const userValue = userPermissions[module]?.[action] ?? false;
+        const planValue = maxModule[action] ?? false;
+        modulePermissions[action] = !!(userValue && planValue);
+      }
     }
+    sanitized[module] = modulePermissions;
   }
 
   return sanitized;
@@ -241,7 +267,7 @@ export function checkPermission(
   action?: string
 ): boolean {
   // أولاً: التحقق من الباقة
-  if (!isPermissionAllowedInPlan(action ? `${module}.${action}` : module, planId)) {
+  if (!isPermissionAllowedInPlan(action ? `${String(module)}.${action}` : String(module), planId)) {
     return false;
   }
 
@@ -313,19 +339,22 @@ export function getDefaultPermissionsForPlan(planId: string): UserPermissions {
  */
 export function getRestrictedPermissionsForPlan(planId: string): UserPermissions {
   const basePermissions = getDefaultPermissionsForPlan(planId);
-  const restricted: UserPermissions = {} as any;
+  const restricted: UserPermissions = { ...EMPTY_PERMISSIONS };
 
-  for (const module in basePermissions) {
-    restricted[module] = {} as any;
-
-    for (const action in basePermissions[module]) {
-      // إزالة صلاحيات الحذف والإدارة للمستخدمين المقيدين
-      if (action === 'delete' || action === 'manage' || action === 'manage_plans' || action === 'manage_discounts') {
-        restricted[module][action] = false;
-      } else {
-        // الاحتفاظ بـ view فقط
-        restricted[module][action] = action === 'view' ? true : false;
+  for (const moduleName in basePermissions) {
+    const baseModule = basePermissions[moduleName];
+    if (baseModule) {
+      const moduleRestricted: Record<string, boolean> = {};
+      for (const action in baseModule) {
+        // إزالة صلاحيات الحذف والإدارة للمستخدمين المقيدين
+        if (action === 'delete' || action === 'manage' || action === 'manage_plans' || action === 'manage_discounts') {
+          moduleRestricted[action] = false;
+        } else {
+          // الاحتفاظ بـ view فقط
+          moduleRestricted[action] = action === 'view';
+        }
       }
+      restricted[moduleName] = moduleRestricted;
     }
   }
 
@@ -347,21 +376,25 @@ export function mergeWithPlanLimits(
   planId: string
 ): UserPermissions {
   const basePermissions = getDefaultPermissionsForPlan(planId);
-  const sanitized: UserPermissions = {} as any;
+  const sanitized: UserPermissions = { ...EMPTY_PERMISSIONS };
 
-  for (const module in basePermissions) {
-    sanitized[module] = {} as any;
+  for (const moduleName in basePermissions) {
+    const moduleSanitized: Record<string, boolean> = {};
+    const baseModule = basePermissions[moduleName];
 
-    for (const action in basePermissions[module]) {
-      const userValue = userPermissions[module]?.[action];
-      const planValue = basePermissions[module][action];
+    if (baseModule) {
+      for (const action in baseModule) {
+        const userValue = userPermissions[moduleName]?.[action];
+        const planValue = baseModule[action];
 
-      // userPermission OR planPermission، لكن لا يمكن تجاوز planPermission
-      if (userValue !== undefined) {
-        sanitized[module][action] = userValue && planValue;
-      } else {
-        sanitized[module][action] = planValue;
+        // userPermission OR planPermission، لكن لا يمكن تجاوز planPermission
+        if (userValue !== undefined) {
+          moduleSanitized[action] = !!(userValue && planValue);
+        } else {
+          moduleSanitized[action] = !!planValue;
+        }
       }
+      sanitized[moduleName] = moduleSanitized;
     }
   }
 
@@ -431,7 +464,7 @@ export type SupportedPlan = typeof SUPPORTED_PLANS[number];
  * التحقق من أن الباقة مدعومة
  */
 export function isValidPlan(planId: string): planId is SupportedPlan {
-  return SUPPORTED_PLANS.includes(planId as SupportedPlan);
+  return (SUPPORTED_PLANS as readonly string[]).includes(planId);
 }
 
 /**

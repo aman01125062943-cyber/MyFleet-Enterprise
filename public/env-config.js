@@ -11,8 +11,9 @@ window._env_ = {
     // For runtime override, deployment scripts can inject values here
     VITE_SUPABASE_URL: 'https://necqtqhmnmcsjxcxgeff.supabase.co',
     VITE_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5lY3F0cWhtbm1jc2p4Y3hnZWZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzODg1NTUsImV4cCI6MjA4NDk2NDU1NX0.vpSOLJbEN1JrASDLiZ1G6-yT_QUZo0JzEDKefKANAaQ',
-    VITE_WHATSAPP_SERVER_URL: '',
-    VITE_WHATSAPP_ENABLED: 'true', // Set to 'false' to disable WhatsApp health checks
+    VITE_WHATSAPP_SERVICE_URL: '',  // Primary - used by WhatsAppSection, healthMonitor
+    VITE_WHATSAPP_SERVER_URL: '',   // Legacy fallback
+    VITE_WHATSAPP_ENABLED: 'true',  // Set to 'false' to disable WhatsApp health checks
     APP_VERSION: '1.0.0'
 };
 

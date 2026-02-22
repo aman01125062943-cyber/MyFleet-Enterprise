@@ -1,0 +1,13 @@
+{
+  "loginPageLoadMs": 3366,
+  "adminPageLoadMs": 205,
+  "webVitals": {
+    "domContentLoaded": 896,
+    "loadComplete": 1602,
+    "domInteractive": 373,
+    "responseEnd": 103,
+    "transferSize": 1419,
+    "duration": 1601.5999999940395
+  },
+  "timestamp": "2026-02-22T01:58:17.850Z"
+}

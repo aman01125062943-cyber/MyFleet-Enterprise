@@ -228,7 +228,7 @@ const Layout: React.FC = () => {
 
   const graceDays = systemConfig?.grace_period_days ?? 7;
   const isExpired = org ? daysLeft < 0 : false;
-  const isFullyBlocked = org ? (daysLeft < -graceDays) : false;
+  const isFullyBlocked = org ? (daysLeft < -graceDays || org.is_active === false) : false;
   const isInGracePeriod = isExpired && !isFullyBlocked;
   const daysInGraceLeft = graceDays + daysLeft;
   const isNearExpiry = org ? (daysLeft >= 0 && daysLeft <= 3) : false;
@@ -392,10 +392,30 @@ const Layout: React.FC = () => {
 
         {/* Global Alerts (Blocking Mode, Grace Period etc) */}
         {isFullyBlocked && (
-          <div className="bg-slate-900 text-white px-4 py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-md z-[60] fixed inset-x-0 top-0 print:hidden backdrop-blur-md">
-            <Lock className="w-5 h-5 text-red-500 animate-pulse" />
-            <span>نظام معطل تماماً: انتهت فترة السماح. يرجى التجديد لاستعادة إمكانية الوصول.</span>
-            <a href={`https://wa.me/${systemConfig?.whatsapp_number || ''}`} target="_blank" className="bg-blue-600 px-3 py-1 rounded-lg text-xs hover:bg-blue-500 transition">تحدث معنا للتفعيل</a>
+          <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-center p-6 space-y-6 animate-in fade-in duration-500">
+            <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mb-4">
+              <Lock className="w-10 h-10 text-red-500 animate-pulse" />
+            </div>
+            <h2 className="text-3xl font-bold text-white uppercase tracking-tight">نظام معطل تماماً</h2>
+            <p className="text-slate-400 max-w-md text-lg">
+              عذراً، الوصول للنظام معطل حالياً لهذه المنظمة. قد يكون ذلك بسبب انتهاء فترة السماح أو تم تعطيل الحساب من قبل الإدارة.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 w-full max-w-xs">
+              <a
+                href={`https://wa.me/${systemConfig?.whatsapp_number || '201066284516'}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition"
+              >
+                <Home className="w-5 h-5" /> تحدث معنا للتفعيل
+              </a>
+              <button
+                onClick={handleLogout}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition"
+              >
+                <LogOut className="w-5 h-5" /> تسجيل الخروج
+              </button>
+            </div>
           </div>
         )}
         {!isFullyBlocked && isInGracePeriod && (

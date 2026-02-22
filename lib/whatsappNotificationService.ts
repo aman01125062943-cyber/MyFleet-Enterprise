@@ -188,7 +188,7 @@ const MESSAGE_TEMPLATES = {
 // ============================================================================
 
 class WhatsAppNotificationService {
-    private serviceUrl = ''; // Uses Vite proxy
+    private serviceUrl = import.meta.env.VITE_WHATSAPP_SERVICE_URL || '';
 
     /**
      * Get the active admin WhatsApp session
