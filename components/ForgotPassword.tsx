@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { ShieldCheck, ArrowLeft, Mail, Loader2, ArrowRight, CheckCircle, AlertCircle } from 'lucide-react';
@@ -51,16 +51,16 @@ const ForgotPassword = () => {
       // 3. Success
       setMessageType('success');
       setMessage('تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني. يرجى التحقق من بريدك الإلكتروني واتبع التعليمات.');
-      
+
       // Clear email after 5 seconds
       setTimeout(() => setEmail(''), 5000);
 
     } catch (err: any) {
       console.error('Password Reset Error:', err);
       setMessageType('error');
-      
+
       let msg = 'حدث خطأ غير متوقع';
-      
+
       if (err.message.includes('Email not found') || err.message.includes('not registered')) {
         msg = 'البريد الإلكتروني غير مسجل في النظام';
       } else if (err.message.includes('Failed to send') || err.message.includes('reset')) {
@@ -68,7 +68,7 @@ const ForgotPassword = () => {
       } else if (err.message.includes('Database error')) {
         msg = 'فشل في الاتصال بقاعدة البيانات';
       }
-      
+
       setMessage(msg);
     } finally {
       setLoading(false);
@@ -84,7 +84,7 @@ const ForgotPassword = () => {
       </div>
 
       <div className="max-w-md w-full bg-white/80 dark:bg-[#1e293b]/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-200 dark:border-slate-700 overflow-hidden z-10 relative transition-all duration-300">
-        
+
         {/* Header */}
         <div className="p-8 pt-10">
           <div className="text-center mb-8">
@@ -96,9 +96,8 @@ const ForgotPassword = () => {
           </div>
 
           {message && (
-            <div className={`mb-6 p-4 rounded-xl flex flex-col items-start gap-2 text-sm animate-in slide-in-from-top-2 ${
-              messageType === 'success' ? 'bg-green-900/20 border-green-500/30 text-green-300' : 'bg-red-900/20 border-red-500/30 text-red-300'
-            }`}>
+            <div className={`mb-6 p-4 rounded-xl flex flex-col items-start gap-2 text-sm animate-in slide-in-from-top-2 ${messageType === 'success' ? 'bg-green-900/20 border-green-500/30 text-green-300' : 'bg-red-900/20 border-red-500/30 text-red-300'
+              }`}>
               <div className="flex items-center gap-2">
                 {messageType === 'success' ? <CheckCircle className="w-5 h-5 shrink-0" /> : <AlertCircle className="w-5 h-5 shrink-0" />}
                 <span>{message}</span>

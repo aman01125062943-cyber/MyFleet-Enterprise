@@ -1,13 +1,22 @@
 import React, { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { DollarSign, TrendingUp, TrendingDown, Plus, Minus, Filter, Download } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Plus, Download } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { LayoutContextType } from './Layout';
-import { assertPermission } from '../lib/planPermissionGuard';
+
+
+interface Transaction {
+  id: string;
+  date: string;
+  type: 'income' | 'expense';
+  amount: number;
+  reason?: string;
+  org_id?: string;
+}
 
 const Financials: React.FC = () => {
   const { user, org } = useOutletContext<LayoutContextType>();
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'income' | 'expense'>('all');
 
@@ -16,7 +25,6 @@ const Financials: React.FC = () => {
     if (!user) return;
 
     // التحقق من صلاحية الوصول للإدارة المالية
-    const planId = org?.subscription_plan || 'trial';
     if (!user.permissions?.finance?.view) {
       return;
     }
@@ -55,6 +63,51 @@ const Financials: React.FC = () => {
 
   const canAdd = user?.permissions?.finance?.add_income || user?.permissions?.finance?.add_expense;
   const canExport = user?.permissions?.finance?.export;
+
+  const renderTableBody = () => {
+    if (loading) {
+      return (
+        <tr>
+          <td colSpan={4} className="text-center py-8 text-slate-500">جاري التحميل...</td>
+        </tr>
+      );
+    }
+    if (filteredTransactions.length === 0) {
+      return (
+        <tr>
+          <td colSpan={4} className="text-center py-8 text-slate-500">
+            لا توجد معاملات
+          </td>
+        </tr>
+      );
+    }
+    return filteredTransactions.map((transaction) => (
+      <tr key={transaction.id} className="hover:bg-slate-50 dark:hover:bg-slate-700">
+        <td className="py-4 px-6 text-sm text-slate-900 dark:text-white">
+          {new Date(transaction.date).toLocaleDateString('ar-EG')}
+        </td>
+        <td className="py-4 px-6">
+          <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${transaction.type === 'income'
+              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300'
+              : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+            }`}>
+            {transaction.type === 'income' ? (
+              <><TrendingUp className="w-3 h-3" /> وارد</>
+            ) : (
+              <><TrendingDown className="w-3 h-3" /> منصرف</>
+            )}
+          </span>
+        </td>
+        <td className={`py-4 px-6 text-sm font-medium ${transaction.type === 'income' ? 'text-emerald-600' : 'text-red-600'
+          }`}>
+          {transaction.amount.toLocaleString()} ج.م
+        </td>
+        <td className="py-4 px-6 text-sm text-slate-600 dark:text-slate-400">
+          {transaction.reason || '-'}
+        </td>
+      </tr>
+    ));
+  };
 
   return (
     <div className="space-y-6">
@@ -110,32 +163,29 @@ const Financials: React.FC = () => {
         <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-lg p-1">
           <button
             onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              filter === 'all'
-                ? 'bg-blue-600 text-white'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
-            }`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${filter === 'all'
+              ? 'bg-blue-600 text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+              }`}
           >
             الكل
           </button>
           <button
             onClick={() => setFilter('income')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${
-              filter === 'income'
-                ? 'bg-emerald-600 text-white'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
-            }`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${filter === 'income'
+              ? 'bg-emerald-600 text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+              }`}
           >
             <TrendingUp className="w-4 h-4" />
             وارد
           </button>
           <button
             onClick={() => setFilter('expense')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${
-              filter === 'expense'
-                ? 'bg-red-600 text-white'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
-            }`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${filter === 'expense'
+              ? 'bg-red-600 text-white'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+              }`}
           >
             <TrendingDown className="w-4 h-4" />
             منصرف
@@ -163,46 +213,7 @@ const Financials: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-              {loading ? (
-                <tr>
-                  <td colSpan={4} className="text-center py-8 text-slate-500">جاري التحميل...</td>
-                </tr>
-              ) : filteredTransactions.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="text-center py-8 text-slate-500">
-                    لا توجد معاملات
-                  </td>
-                </tr>
-              ) : (
-                filteredTransactions.map((transaction) => (
-                  <tr key={transaction.id} className="hover:bg-slate-50 dark:hover:bg-slate-700">
-                    <td className="py-4 px-6 text-sm text-slate-900 dark:text-white">
-                      {new Date(transaction.date).toLocaleDateString('ar-EG')}
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
-                        transaction.type === 'income'
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300'
-                          : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                      }`}>
-                        {transaction.type === 'income' ? (
-                          <><TrendingUp className="w-3 h-3" /> وارد</>
-                        ) : (
-                          <><TrendingDown className="w-3 h-3" /> منصرف</>
-                        )}
-                      </span>
-                    </td>
-                    <td className={`py-4 px-6 text-sm font-medium ${
-                      transaction.type === 'income' ? 'text-emerald-600' : 'text-red-600'
-                    }`}>
-                      {transaction.amount.toLocaleString()} ج.م
-                    </td>
-                    <td className="py-4 px-6 text-sm text-slate-600 dark:text-slate-400">
-                      {transaction.reason || '-'}
-                    </td>
-                  </tr>
-                ))
-              )}
+              {renderTableBody()}
             </tbody>
           </table>
         </div>

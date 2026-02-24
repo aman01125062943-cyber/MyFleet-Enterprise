@@ -14,6 +14,7 @@
 import { supabase } from './supabaseClient';
 import { performGlobalLogout } from './authUtils';
 import { Profile, UserPermissions } from '../types';
+import type { Session, User } from '@supabase/supabase-js';
 
 // ====================================================================
 // Configuration
@@ -296,7 +297,7 @@ export const secureRpcCall = async <T = unknown>(
                         console.log(`🔄 Auth error detected, attempting token refresh...`);
 
                         // Try to refresh the session
-                        const { data: { session: newSession }, error: refreshError } =
+                        const { error: refreshError } =
                             await supabase.auth.refreshSession();
 
                         if (refreshError) {
@@ -497,8 +498,8 @@ export const secureRpcCallWithPermission = async <T = unknown>(
  */
 export const checkSessionValidity = async (): Promise<{
     isValid: boolean;
-    session: any | null;
-    user: any | null;
+    session: Session | null;
+    user: User | null;
 }> => {
     try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -508,7 +509,7 @@ export const checkSessionValidity = async (): Promise<{
         }
 
         // Verify session is actually valid by checking user profile
-        const { data: user } = await supabase.auth.getUser();
+        const { data: { user } } = await supabase.auth.getUser();
 
         // Additional server-side validation
         if (user) {
@@ -548,7 +549,7 @@ export const apiGet = (url: string, options?: Omit<AuthenticatedFetchOptions, 'b
 /**
  * POST request with automatic auth
  */
-export const apiPost = <T = unknown>(url: string, data?: any, options?: Omit<AuthenticatedFetchOptions, 'body'>) => {
+export const apiPost = (url: string, data?: unknown, options?: Omit<AuthenticatedFetchOptions, 'body'>) => {
     return authenticatedFetch(url, {
         ...options,
         method: 'POST',
@@ -559,7 +560,7 @@ export const apiPost = <T = unknown>(url: string, data?: any, options?: Omit<Aut
 /**
  * PUT request with automatic auth
  */
-export const apiPut = <T = unknown>(url: string, data?: any, options?: Omit<AuthenticatedFetchOptions, 'body'>) => {
+export const apiPut = (url: string, data?: unknown, options?: Omit<AuthenticatedFetchOptions, 'body'>) => {
     return authenticatedFetch(url, {
         ...options,
         method: 'PUT',

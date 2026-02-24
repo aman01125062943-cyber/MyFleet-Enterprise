@@ -41,7 +41,6 @@ import { Profile, UserPermissions } from '../types';
  * Maps to the structure of UserPermissions
  */
 export type PermissionModule = keyof UserPermissions;
-export type PermissionAction = string; // 'view', 'add', 'edit', 'delete', 'manage', etc.
 
 /**
  * Permission assertion options
@@ -67,7 +66,7 @@ export interface PermissionCheckResult {
   granted: boolean;
   reason?: string;
   module?: PermissionModule;
-  action?: PermissionAction;
+  action?: string;
 }
 
 // ====================================================================
@@ -81,7 +80,7 @@ export interface PermissionCheckResult {
 export class PermissionError extends Error {
   public readonly code: string;
   public readonly module?: PermissionModule;
-  public readonly action?: PermissionAction;
+  public readonly action?: string;
   public readonly userId?: string;
   public readonly userRole?: string;
 
@@ -90,7 +89,7 @@ export class PermissionError extends Error {
     options: {
       code?: string;
       module?: PermissionModule;
-      action?: PermissionAction;
+      action?: string;
       userId?: string;
       userRole?: string;
     } = {}
@@ -166,7 +165,7 @@ function isPermissionObject(value: unknown): value is Record<string, boolean> {
 function hasPermission(
   permissions: UserPermissions | undefined,
   module: PermissionModule,
-  action?: PermissionAction
+  action?: string
 ): PermissionCheckResult {
   // No permissions object
   if (!permissions) {
@@ -310,7 +309,7 @@ function validateRoleAccess(
 export async function assertPermission(
   profile: Profile | null,
   module: PermissionModule,
-  action?: PermissionAction,
+  action?: string,
   options: AssertPermissionOptions = {}
 ): Promise<void> {
   const { errorMessage, validateWithServer = false } = options;
@@ -374,7 +373,8 @@ export async function assertPermission(
   // ====================================================================
   // Step 3: Check module/action permission
   // ====================================================================
-  const permissionCheck = hasPermission(validatedProfile.permissions, module, action);
+  const finalProfile = validatedProfile as Profile;
+  const permissionCheck = hasPermission(finalProfile.permissions, module, action);
 
   if (!permissionCheck.granted) {
     throw new PermissionError(
@@ -383,8 +383,8 @@ export async function assertPermission(
         code: action ? 'ACTION_NOT_ALLOWED' : 'MODULE_ACCESS_DENIED',
         module,
         action,
-        userId: validatedProfile.id,
-        userRole: validatedProfile.role,
+        userId: finalProfile.id,
+        userRole: finalProfile.role,
       }
     );
   }
@@ -430,7 +430,7 @@ export function assertRole(
     );
   }
 
-  const roleCheck = validateRoleAccess(profile, requiredRoles);
+  const roleCheck = validateRoleAccess(profile as Profile, requiredRoles);
   if (!roleCheck.granted) {
     throw new PermissionError(
       errorMessage || `This action requires one of the following roles: ${requiredRoles.join(', ')}`,
@@ -474,7 +474,7 @@ export function assertRole(
 export function checkPermission(
   profile: Profile | null,
   module: PermissionModule,
-  action?: PermissionAction
+  action?: string
 ): PermissionCheckResult {
   const statusCheck = validateProfileStatus(profile);
   if (!statusCheck.granted) {
@@ -509,7 +509,7 @@ export function checkRole(
     return false;
   }
 
-  const roleCheck = validateRoleAccess(profile, requiredRoles);
+  const roleCheck = validateRoleAccess(profile as Profile, requiredRoles);
   return roleCheck.granted;
 }
 
@@ -543,7 +543,7 @@ export function checkRole(
  */
 export function checkPermissions(
   profile: Profile | null,
-  permissions: Array<{ module: PermissionModule; action?: PermissionAction }>
+  permissions: Array<{ module: PermissionModule; action?: string }>
 ): Record<string, boolean> {
   const results: Record<string, boolean> = {};
 
@@ -624,6 +624,3 @@ export const PERMISSION_GUARD_CONFIG = {
   VERSION: '1.0.0',
   DEFAULT_PERMISSION_ACTION: 'view',
 };
-
-// Re-export PermissionError for convenience
-export { PermissionError };

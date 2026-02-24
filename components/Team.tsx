@@ -127,6 +127,7 @@ const getRoleBadgeStyles = (role?: string) => {
     }
 };
 
+// eslint-disable-next-line sonarjs/cognitive-complexity
 const Team: React.FC = () => {
     const { user, org, isReadOnly } = useOutletContext<LayoutContextType>();
     const { showToast } = useToast();
@@ -316,9 +317,7 @@ const Team: React.FC = () => {
         }
 
         try {
-            // @ts-expect-error: import.meta might not be available
             const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-            // @ts-expect-error: import.meta might not be available
             const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
             // SECURITY: Validate credentials exist - no hardcoded fallbacks
@@ -407,7 +406,7 @@ const Team: React.FC = () => {
     const togglePerm = (category: keyof UserPermissions, key: string) => {
         if (isReadOnly) return;
 
-        const currentValue = (formData.permissions[category] as any)?.[key] || false;
+        const currentValue = (formData.permissions[category] as Record<string, boolean>)?.[key] || false;
         const newValue = !currentValue;
 
         // إذا كان المحاولة تفعيل صلاحية، تأكد أنها مسموحة في الباقة
@@ -593,11 +592,10 @@ const Team: React.FC = () => {
                                                 key={planId}
                                                 type="button"
                                                 onClick={() => handlePlanChange(planId)}
-                                                className={`p-4 rounded-xl border-2 transition-all text-center ${
-                                                    isSelected
-                                                        ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/20'
-                                                        : 'border-gray-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 bg-slate-50 dark:bg-[#1e293b]'
-                                                }`}
+                                                className={`p-4 rounded-xl border-2 transition-all text-center ${isSelected
+                                                    ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/20'
+                                                    : 'border-gray-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 bg-slate-50 dark:bg-[#1e293b]'
+                                                    }`}
                                             >
                                                 <div className={`font-bold text-sm mb-1 ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>
                                                     {planName}
@@ -627,7 +625,9 @@ const Team: React.FC = () => {
                                         <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2 flex items-center justify-between">
                                             <span>🚗 إدارة الأسطول</span>
                                             {!maxPermissionsForCurrentPlan.inventory?.view && (
-                                                <Lock className="w-4 h-4 text-amber-500" title="غير متاح في هذه الباقة" />
+                                                <span title="غير متاح في هذه الباقة">
+                                                    <Lock className="w-4 h-4 text-amber-500" />
+                                                </span>
                                             )}
                                         </div>
                                         <div className="space-y-3">
@@ -698,7 +698,9 @@ const Team: React.FC = () => {
                                         <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2 flex items-center justify-between">
                                             <span>💰 المالية</span>
                                             {!maxPermissionsForCurrentPlan.finance?.view && (
-                                                <Lock className="w-4 h-4 text-amber-500" title="غير متاح في هذه الباقة" />
+                                                <span title="غير متاح في هذه الباقة">
+                                                    <Lock className="w-4 h-4 text-amber-500" />
+                                                </span>
                                             )}
                                         </div>
                                         <div className="space-y-3">
@@ -754,7 +756,9 @@ const Team: React.FC = () => {
                                         <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2 flex items-center justify-between">
                                             <span>🏗️ الأصول</span>
                                             {!maxPermissionsForCurrentPlan.assets?.view && (
-                                                <Lock className="w-4 h-4 text-amber-500" title="غير متاح في هذه الباقة" />
+                                                <span title="غير متاح في هذه الباقة">
+                                                    <Lock className="w-4 h-4 text-amber-500" />
+                                                </span>
                                             )}
                                         </div>
                                         <div className="space-y-3">
@@ -786,7 +790,9 @@ const Team: React.FC = () => {
                                         <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2 flex items-center justify-between">
                                             <span>👥 الإدارة</span>
                                             {!maxPermissionsForCurrentPlan.team?.view && (
-                                                <Lock className="w-4 h-4 text-amber-500" title="غير متاح في هذه الباقة" />
+                                                <span title="غير متاح في هذه الباقة">
+                                                    <Lock className="w-4 h-4 text-amber-500" />
+                                                </span>
                                             )}
                                         </div>
                                         <div className="space-y-3">
@@ -811,7 +817,9 @@ const Team: React.FC = () => {
                                         <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2 flex items-center justify-between">
                                             <span>📊 التقارير</span>
                                             {!maxPermissionsForCurrentPlan.reports?.view && (
-                                                <Lock className="w-4 h-4 text-amber-500" title="غير متاح في هذه الباقة" />
+                                                <span title="غير متاح في هذه الباقة">
+                                                    <Lock className="w-4 h-4 text-amber-500" />
+                                                </span>
                                             )}
                                         </div>
                                         <div className="space-y-3">

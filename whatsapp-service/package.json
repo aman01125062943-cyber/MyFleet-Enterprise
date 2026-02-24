@@ -6,7 +6,7 @@
     "type": "module",
     "scripts": {
         "start": "node server.js",
-        "dev": "node --watch server.js",
+        "dev": "nodemon --ignore auth_sessions/ server.js",
         "worker": "node notificationWorker.js",
         "cleanup": "node cleanupOldSessions.js",
         "test": "echo \"Error: no test specified\" && exit 1"

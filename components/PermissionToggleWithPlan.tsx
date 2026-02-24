@@ -12,7 +12,7 @@
 import React from 'react';
 import { Lock, Crown, Info } from 'lucide-react';
 import type { UserPermissions } from '../types';
-import { PLAN_MAX_PERMISSIONS, PLAN_NAMES_AR } from '../lib/planPermissionGuard';
+import { PLAN_NAMES_AR } from '../lib/planPermissionGuard';
 
 interface PermissionToggleProps {
   label: string;
@@ -45,9 +45,8 @@ export function PermissionToggle({
 
   return (
     <label
-      className={`flex items-center gap-3 cursor-pointer transition-opacity ${
-        isDisabled ? 'opacity-60 cursor-not-allowed' : ''
-      }`}
+      className={`flex items-center gap-3 cursor-pointer transition-opacity ${isDisabled ? 'opacity-60 cursor-not-allowed' : ''
+        }`}
     >
       <div className="relative">
         <input
@@ -55,9 +54,8 @@ export function PermissionToggle({
           checked={checked}
           onChange={onChange}
           disabled={isDisabled}
-          className={`w-4 h-4 accent-blue-600 rounded ${
-            isLocked ? 'opacity-50' : ''
-          }`}
+          className={`w-4 h-4 accent-blue-600 rounded ${isLocked ? 'opacity-50' : ''
+            }`}
         />
         {isLocked && (
           <div className="absolute -top-1 -right-1 w-3 h-3 bg-slate-700 rounded-full flex items-center justify-center">
@@ -67,10 +65,11 @@ export function PermissionToggle({
       </div>
       <span className="text-sm text-slate-600 dark:text-slate-400">{label}</span>
       {isLocked && (
-        <Info
-          className="w-4 h-4 text-amber-500"
-          title={`غير متاح في باقة ${planId ? PLAN_NAMES_AR[planId as keyof typeof PLAN_NAMES_AR] : 'الحالية'}`}
-        />
+        <span title={`غير متاح في باقة ${planId ? PLAN_NAMES_AR[planId as keyof typeof PLAN_NAMES_AR] : 'الحالية'}`}>
+          <Info
+            className="w-4 h-4 text-amber-500"
+          />
+        </span>
       )}
     </label>
   );
@@ -105,16 +104,15 @@ export function PermissionModule({
   // التحقق من أن الوحدة مسموحة في الباقة
   const isModuleAllowed = maxPermissions?.[module];
   const hasAnyAllowedPermission = isModuleAllowed
-    ? Object.values(isModuleAllowed).some(v => v === true)
+    ? Object.values(isModuleAllowed || {}).some((v) => v === true)
     : false;
 
   return (
     <div
-      className={`bg-slate-50 dark:bg-[#1e293b] p-4 rounded-xl border transition-all ${
-        hasAnyAllowedPermission
-          ? 'border-gray-200 dark:border-slate-700'
-          : 'border-amber-200 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/10'
-      }`}
+      className={`bg-slate-50 dark:bg-[#1e293b] p-4 rounded-xl border transition-all ${hasAnyAllowedPermission
+        ? 'border-gray-200 dark:border-slate-700'
+        : 'border-amber-200 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/10'
+        }`}
     >
       <div className="flex items-center justify-between mb-3 border-b border-gray-200 dark:border-slate-700 pb-2">
         <div className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
@@ -160,7 +158,7 @@ export function PlanInfoBar({ planId, maxPermissions }: PlanInfoBarProps) {
 
   // حساب الصلاحيات المتاحة
   const availableModules = Object.entries(maxPermissions)
-    .filter(([_, perms]) => Object.values(perms).some(v => v === true))
+    .filter(([_, perms]) => Object.values(perms || {}).some(v => v === true))
     .map(([module]) => module)
     .length;
 
@@ -259,8 +257,8 @@ export function PermissionSummary({
   let planEnabled = 0;
   let planTotal = 0;
 
-  Object.entries(maxPermissions).forEach(([module, perms]) => {
-    Object.entries(perms).forEach(([action, allowed]) => {
+  Object.entries(maxPermissions || {}).forEach(([module, perms]) => {
+    Object.entries(perms || {}).forEach(([action, allowed]) => {
       planTotal++;
       if (allowed) planEnabled++;
 
@@ -270,7 +268,6 @@ export function PermissionSummary({
   });
 
   const usagePercentage = planTotal > 0 ? (userEnabled / planEnabled) * 100 : 0;
-  const efficiencyPercentage = userTotal > 0 ? (userEnabled / userTotal) * 100 : 0;
 
   return (
     <div className="grid grid-cols-3 gap-4 mb-6">

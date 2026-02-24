@@ -13,14 +13,15 @@ export const syncData = async () => {
     for (const item of queue) {
         try {
             let error = null;
-            const dataToSync = { ...item.data, last_updated: Date.now() };
+            const itemData = item.data as any;
+            const dataToSync = { ...itemData, last_updated: Date.now() };
 
             if (item.table === 'cars') {
                 if (item.action === 'insert' || item.action === 'update') {
                     const { error: err } = await supabase.from('cars').upsert(dataToSync);
                     error = err;
                 } else if (item.action === 'delete') {
-                    const { error: err } = await supabase.from('cars').delete().eq('id', item.data.id);
+                    const { error: err } = await supabase.from('cars').delete().eq('id', (item.data as any).id);
                     error = err;
                 }
             } else if (item.table === 'transactions') {
@@ -28,7 +29,7 @@ export const syncData = async () => {
                     const { error: err } = await supabase.from('transactions').upsert(dataToSync);
                     error = err;
                 } else if (item.action === 'delete') {
-                    const { error: err } = await supabase.from('transactions').delete().eq('id', item.data.id);
+                    const { error: err } = await supabase.from('transactions').delete().eq('id', (item.data as any).id);
                     error = err;
                 }
             }

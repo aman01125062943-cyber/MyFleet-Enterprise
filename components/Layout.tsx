@@ -228,7 +228,16 @@ const Layout: React.FC = () => {
 
   const graceDays = systemConfig?.grace_period_days ?? 7;
   const isExpired = org ? daysLeft < 0 : false;
-  const isFullyBlocked = org ? (daysLeft < -graceDays || org.is_active === false) : false;
+
+  // 🔒 تحديد ما إذا كان النظام محظوراً تماماً
+  // يتم الحظر إذا:
+  // 1. تجاوز المستخدم فترة السماح (daysLeft < -graceDays)
+  // 2. أو تم تعطيل المنظمة يدوياً (is_active === false)
+  // 3. يستثنى المدير العام (super_admin) من الحظر لضمان قدرته على الإدارة
+  const isFullyBlocked = org
+    ? (daysLeft < -graceDays || org.is_active === false) && userProfile?.role !== 'super_admin'
+    : false;
+
   const isInGracePeriod = isExpired && !isFullyBlocked;
   const daysInGraceLeft = graceDays + daysLeft;
   const isNearExpiry = org ? (daysLeft >= 0 && daysLeft <= 3) : false;
@@ -402,12 +411,12 @@ const Layout: React.FC = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 w-full max-w-xs">
               <a
-                href={`https://wa.me/${systemConfig?.whatsapp_number || '201066284516'}`}
+                href={`https://wa.me/${systemConfig?.whatsapp_number || '201066284516'}?text=السلام عليكم، أرغب في تجديد الاشتراك لمركز: ${org?.name} (معرف: ${org?.id})`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition"
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition"
               >
-                <Home className="w-5 h-5" /> تحدث معنا للتفعيل
+                <Wifi className="w-5 h-5" /> تحدث معنا للتجديد
               </a>
               <button
                 onClick={handleLogout}
@@ -416,6 +425,7 @@ const Layout: React.FC = () => {
                 <LogOut className="w-5 h-5" /> تسجيل الخروج
               </button>
             </div>
+            <p className="text-xs text-slate-500 mt-4">معرف الوكالة: {org?.id}</p>
           </div>
         )}
         {!isFullyBlocked && isInGracePeriod && (
@@ -483,9 +493,9 @@ const Layout: React.FC = () => {
         </div>
       )}
 
-      {/* Block Modal */}
+      {/* Unified Block Modal for Trials and Legacy Blocking */}
       {
-        org?.subscription_plan === 'trial' && isExpired && (
+        org?.subscription_plan === 'trial' && isExpired && !isFullyBlocked && (
           <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex items-center justify-center p-4">
             <div className="bg-white dark:bg-[#1e293b] w-full max-w-md p-8 rounded-3xl shadow-2xl text-center border border-slate-700 animate-in zoom-in-95 duration-300">
               <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -497,7 +507,7 @@ const Layout: React.FC = () => {
               </p>
 
               <a
-                href={`https://wa.me/${systemConfig?.whatsapp_number || '966500000000'}?text=السلام عليكم، انتهت الفترة التجريبية وارغب في الاشتراك في الباقة المدفوعة`}
+                href={`https://wa.me/${systemConfig?.whatsapp_number || '201066284516'}?text=السلام عليكم، انتهت الفترة التجريبية لمنظمة ${org?.name} وارغب في الاشتراك في الباقة المدفوعة`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition-all hover:scale-[1.02] shadow-lg shadow-emerald-500/20"
