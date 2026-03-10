@@ -1,0 +1,182 @@
+{
+    "tech_stack": [
+        "TypeScript",
+        "React 18",
+        "Vite",
+        "Tailwind CSS",
+        "Supabase",
+        "React Router DOM",
+        "Recharts",
+        "Lucide React Icons",
+        "Dexie (IndexedDB)",
+        "PWA"
+    ],
+    "features": [
+        {
+            "name": "Authentication System",
+            "description": "User authentication with login, registration, and session management using Supabase Auth",
+            "files": [
+                "components/AuthScreen.tsx",
+                "lib/supabaseClient.ts"
+            ]
+        },
+        {
+            "name": "Dashboard",
+            "description": "Main dashboard displaying system overview, statistics, and quick actions",
+            "files": [
+                "components/Dashboard.tsx"
+            ]
+        },
+        {
+            "name": "Super Admin Dashboard",
+            "description": "Comprehensive admin panel for managing users, organizations, plans, payment requests, discount codes, system settings, and analytics",
+            "files": [
+                "components/SuperAdminDashboard.tsx",
+                "components/AnalyticsDashboard.tsx",
+                "lib/analytics.ts"
+            ]
+        },
+        {
+            "name": "Inventory Management",
+            "description": "Vehicle fleet management with CRUD operations, status tracking, maintenance records, and document management",
+            "files": [
+                "components/Inventory.tsx"
+            ]
+        },
+        {
+            "name": "Financial Management",
+            "description": "Income and expense tracking with categorization, reports, and balance calculations",
+            "files": [
+                "components/Dashboard.tsx"
+            ]
+        },
+        {
+            "name": "Assets Management",
+            "description": "Management of company assets including equipment, tools, and other resources",
+            "files": [
+                "components/Assets.tsx"
+            ]
+        },
+        {
+            "name": "Team Management",
+            "description": "User and team member management with role-based permissions (Owner, Admin, Supervisor, Driver)",
+            "files": [
+                "components/Team.tsx",
+                "components/Settings.tsx"
+            ]
+        },
+        {
+            "name": "Trip Calculator",
+            "description": "Calculate trip costs, fuel consumption, and profitability",
+            "files": [
+                "components/TripCalculator.tsx"
+            ]
+        },
+        {
+            "name": "Subscription System",
+            "description": "Multi-tier subscription plans with trial periods, payment processing via InstaPay/Vodafone Cash, and subscription management",
+            "files": [
+                "components/SubscriptionPage.tsx",
+                "components/PricingPage.tsx",
+                "components/PricingSection.tsx",
+                "components/SubscriptionRoute.tsx"
+            ]
+        },
+        {
+            "name": "Payment Requests",
+            "description": "Manual payment verification system where users upload receipts and admins approve/reject requests",
+            "files": [
+                "components/SuperAdminDashboard.tsx"
+            ]
+        },
+        {
+            "name": "Discount Codes",
+            "description": "Promotional discount code system with percentage or fixed amount discounts",
+            "files": [
+                "components/SuperAdminDashboard.tsx"
+            ]
+        },
+        {
+            "name": "Landing Page",
+            "description": "Marketing landing page showcasing features and pricing",
+            "files": [
+                "components/LandingPage.tsx"
+            ]
+        },
+        {
+            "name": "Settings & Configuration",
+            "description": "User profile settings, organization settings, and system preferences",
+            "files": [
+                "components/Settings.tsx"
+            ]
+        },
+        {
+            "name": "Analytics & Reports",
+            "description": "System-wide analytics including user stats, revenue tracking, subscription metrics, and growth data",
+            "files": [
+                "components/AnalyticsDashboard.tsx",
+                "lib/analytics.ts"
+            ]
+        },
+        {
+            "name": "Offline Sync",
+            "description": "Local database synchronization using Dexie for offline functionality",
+            "files": [
+                "lib/db.ts",
+                "lib/syncManager.ts"
+            ]
+        },
+        {
+            "name": "Export Functionality",
+            "description": "Export data to Excel/CSV format",
+            "files": [
+                "components/ExportButton.tsx"
+            ]
+        },
+        {
+            "name": "Toast Notifications",
+            "description": "User feedback system with toast notifications",
+            "files": [
+                "components/Toast.tsx",
+                "components/ToastProvider.tsx"
+            ]
+        },
+        {
+            "name": "Theme System",
+            "description": "Dark mode theme provider",
+            "files": [
+                "components/ThemeProvider.tsx"
+            ]
+        },
+        {
+            "name": "Error Handling",
+            "description": "Global error boundary for catching and displaying errors",
+            "files": [
+                "components/ErrorBoundary.tsx"
+            ]
+        },
+        {
+            "name": "Welcome & Announcements",
+            "description": "Onboarding modals and system announcements",
+            "files": [
+                "components/WelcomeModal.tsx",
+                "components/AnnouncementModal.tsx"
+            ]
+        },
+        {
+            "name": "Database Viewer",
+            "description": "Admin tool for viewing and managing database tables",
+            "files": [
+                "components/DatabaseViewer.tsx"
+            ]
+        },
+        {
+            "name": "Layout & Navigation",
+            "description": "Application layout with sidebar navigation and responsive design",
+            "files": [
+                "components/Layout.tsx",
+                "App.tsx"
+            ]
+        }
+    ]
+}

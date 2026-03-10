@@ -1,0 +1,608 @@
+[
+  {
+    "id": "TC001",
+    "title": "Login Success with Valid Credentials",
+    "description": "Ensure users can log in successfully with correct username and password and are assigned the correct role and session.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the login page"
+      },
+      {
+        "type": "action",
+        "description": "Enter valid username and password"
+      },
+      {
+        "type": "action",
+        "description": "Click the login button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify login succeeds and user navigates to the dashboard with the correct user role"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify user session is established with proper role (admin, user, driver)"
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Login Failure with Invalid Credentials",
+    "description": "Verify login fails with incorrect username or password and appropriate error message is shown.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the login page"
+      },
+      {
+        "type": "action",
+        "description": "Enter invalid username and/or password"
+      },
+      {
+        "type": "action",
+        "description": "Click the login button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify login is rejected and an error message is displayed"
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Data Isolation Between Different Organizations",
+    "description": "Ensure that user from organization A cannot access data belonging to organization B.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as a user from organization A"
+      },
+      {
+        "type": "action",
+        "description": "Navigate through fleet management, assets, and reports"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify all displayed data belongs only to organization A (org_id verification)"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to access data or endpoints related to organization B by manipulating requests or URLs"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify access is denied and no data from organization B is leaked"
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "RBAC Enforcement on Navigation and API Calls",
+    "description": "Validate that role-based access control prevents unauthorized access at UI and RPC/database level.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as a user with 'driver' role"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to navigate to admin-only screens such as user management or fleet editing"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify UI prevents navigation or shows access denied messages"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to call protected RPCs or APIs that require admin privileges"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify backend denies access and returns authorization errors"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "CRUD Operations for Vehicles in Fleet Management",
+    "description": "Test adding, editing, and deleting vehicles from the fleet management module and validate changes reflect in DB.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as admin user"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to fleet management vehicles page"
+      },
+      {
+        "type": "action",
+        "description": "Add a new vehicle with valid data"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify vehicle appears in the vehicle list and DB with correct org_id"
+      },
+      {
+        "type": "action",
+        "description": "Edit the newly added vehicle's status and details"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify changes are saved and reflected in the UI and DB"
+      },
+      {
+        "type": "action",
+        "description": "Delete the vehicle"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm vehicle is removed from UI and DB"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "CRUD Operations for Drivers in Fleet Management",
+    "description": "Test adding, editing, and deleting drivers and validate accurate reflection in the database.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as admin user"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to drivers management page"
+      },
+      {
+        "type": "action",
+        "description": "Add a new driver with valid information"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify driver appears correctly in the list and database entries with correct org_id"
+      },
+      {
+        "type": "action",
+        "description": "Update driver's details and status"
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure updates are reflected in UI and database"
+      },
+      {
+        "type": "action",
+        "description": "Delete the driver"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm deletion from UI and database"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Schedule and Record Fleet Trips with Cost Calculation",
+    "description": "Verify drivers or authorized users can schedule trips, record trips, and the trip cost is correctly calculated and stored.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as a driver or user with trip scheduling permission"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to trip scheduling module"
+      },
+      {
+        "type": "action",
+        "description": "Create a trip with valid data (vehicle, driver, start/end location, date/time)"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm trip is saved and visible in trips list"
+      },
+      {
+        "type": "action",
+        "description": "Use the trip cost calculator to compute cost based on trip details"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify calculated cost is accurate per business formula"
+      },
+      {
+        "type": "action",
+        "description": "Record the completed trip and save trip data and cost"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify trip data and cost are stored in the database and reflected in financial reports"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Asset and Expense Management CRUD and Financial Link",
+    "description": "Check adding, editing, deleting assets and expenses, linking them to financial accounts correctly updates net profitability.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as admin or financial officer"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to assets and expenses management section"
+      },
+      {
+        "type": "action",
+        "description": "Add a new asset with all required details"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify asset is saved and linked correctly in database with org_id"
+      },
+      {
+        "type": "action",
+        "description": "Add an expense related to an asset or fleet operation"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm expense is recorded and linked to correct financial account"
+      },
+      {
+        "type": "action",
+        "description": "Edit asset or expense details"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify updates reflect in database and related profitability calculations"
+      },
+      {
+        "type": "action",
+        "description": "Delete asset or expense"
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure deletion from UI and DB and profitability recalculated accordingly"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Interactive Dashboard and Reports Display Accurate Data",
+    "description": "Verify the dashboard displays accurate and up-to-date graphs and statistics based on DB data for revenues, expenses, and fleet operations.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as a user with access to dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the dashboard and analytics pages"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that graphs for revenue, expenses, and trips correctly reflect test data from the database"
+      },
+      {
+        "type": "action",
+        "description": "Generate reports for different time ranges (daily, monthly, yearly)"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm report data matches database records and displayed visuals update accordingly"
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "RBAC Validation on RPC Calls for Data Mutations",
+    "description": "Ensure that RPC calls for creating, updating, deleting fleet data enforce role permissions and reject unauthorized attempts.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as a regular user without admin privileges"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to call RPCs for fleet modifications (add/edit/delete vehicles, drivers, trips)"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify server rejects unauthorized RPC calls with permission error"
+      },
+      {
+        "type": "action",
+        "description": "Repeat the above steps for a driver role"
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure only allowed RPCs succeed and all others fail with proper error codes"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Database Migration Scripts Execution",
+    "description": "Test that full_db_setup.sql, assets_migration.sql, fix_assets_permissions.sql, fix_profiles.sql execute successfully without errors on a new Supabase project.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Set up a new Supabase project environment"
+      },
+      {
+        "type": "action",
+        "description": "Run full_db_setup.sql script"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify no errors occur and all tables, roles, and functions are created"
+      },
+      {
+        "type": "action",
+        "description": "Run assets_migration.sql"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm successful schema and data updates related to assets"
+      },
+      {
+        "type": "action",
+        "description": "Execute fix_assets_permissions.sql and fix_profiles.sql"
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure permissions and role profiles are fixed without error"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Performance Testing for Dashboard and Fleet Search",
+    "description": "Verify dashboard and fleet search pages load and display results within 300-500ms with a mid-sized test dataset (1000-5000 records).",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Populate database with 1000 to 5000 test records including vehicles, drivers, trips, financial data"
+      },
+      {
+        "type": "action",
+        "description": "Log in as user with access to dashboard"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to dashboard and measure page load and graph rendering times"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm load time is between 300-500ms"
+      },
+      {
+        "type": "action",
+        "description": "Use search functionality in fleet management for vehicles and drivers"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify search results return and display within acceptable time frame (300-500ms)"
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Role-Based UI Element Visibility",
+    "description": "Check that UI elements and navigation items render or hide according to the logged in user’s role and permissions.",
+    "category": "ui",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as admin user"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify admin navigation items and action buttons are visible"
+      },
+      {
+        "type": "action",
+        "description": "Log out and log in as regular user"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify restricted admin UI elements are hidden or disabled"
+      },
+      {
+        "type": "action",
+        "description": "Log out and log in as driver"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify UI only shows permitted actions relevant to driver role"
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "User Session Management and Expiry",
+    "description": "Validate user sessions are created on login, maintained during usage, and expire after expected timeout or logout.",
+    "category": "security",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as any user"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify session is created and maintained as user navigates the app"
+      },
+      {
+        "type": "action",
+        "description": "Idle or remain inactive until session timeout threshold is reached"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify session expires and user is required to log in again"
+      },
+      {
+        "type": "action",
+        "description": "Log in again and explicitly log out"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify session is terminated and access to protected pages is denied"
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Input Validation and Error Handling on Form Submissions",
+    "description": "Test that all form inputs for adding/editing vehicles, drivers, trips, and assets validate data correctly and handle errors gracefully.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Attempt to submit forms with missing required fields"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify validation errors are shown and form submission is blocked"
+      },
+      {
+        "type": "action",
+        "description": "Enter invalid data formats (e.g., invalid dates, non-numeric costs)"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm error messages are displayed and submission is prevented"
+      },
+      {
+        "type": "action",
+        "description": "Submit form with valid data"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify successful form submission and data saved correctly"
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Financial Reports Export Functionality",
+    "description": "Validate exporting reports to CSV and PDF formats works correctly and includes accurate data.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to reports generation page"
+      },
+      {
+        "type": "action",
+        "description": "Generate a financial report for a given date range"
+      },
+      {
+        "type": "action",
+        "description": "Export the report to CSV format"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the CSV file downloads, opens correctly and contains accurate data"
+      },
+      {
+        "type": "action",
+        "description": "Export the report to PDF format"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm the PDF file downloads and displays correct formatted data"
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Onboarding Flow for New Organization Setup",
+    "description": "Test the onboarding experience for creating a new organization including running full_db_setup.sql and environment configuration.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Simulate new organization creator initiating setup"
+      },
+      {
+        "type": "action",
+        "description": "Run full_db_setup.sql script on fresh Supabase instance"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the database is correctly initialized with all required tables and functions"
+      },
+      {
+        "type": "action",
+        "description": "Configure environment variables VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm system operates correctly with these configurations during login and usage"
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Zero Trust and SECURITY DEFINER Enforcement on DB Functions",
+    "description": "Verify security best practices: RPC functions marked SECURITY DEFINER only execute with proper authentication and do not expose sensitive information.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Call RPC functions with valid authenticated user"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that functions execute successfully and return expected data"
+      },
+      {
+        "type": "action",
+        "description": "Call RPC functions with invalid or unauthenticated requests"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm access is denied and no sensitive data is leaked"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to escalate privileges via RPC calls"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that Zero Trust policies prevent any unauthorized privilege escalation"
+      }
+    ]
+  }
+]

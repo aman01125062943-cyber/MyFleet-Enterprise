@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # ===========================================
+  # Nginx Reverse Proxy (Main Entry Point)
+  # ===========================================
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - whatsapp
+    restart: unless-stopped
+    networks:
+      - myfleet-network
+
+  # ===========================================
+  # Frontend (React + Vite)
+  # ===========================================
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    expose:
+      - "5173"
+    environment:
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+      - VITE_WHATSAPP_SERVICE_URL=/api/wa
+    restart: unless-stopped
+    networks:
+      - myfleet-network
+
+  # ===========================================
+  # WhatsApp Service
+  # ===========================================
+  whatsapp:
+    build:
+      context: ./whatsapp-service
+      dockerfile: Dockerfile
+    expose:
+      - "3002"
+    environment:
+      - PORT=3002
+      - SUPABASE_URL=${VITE_SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - FRONTEND_URL=http://nginx
+    volumes:
+      - whatsapp_sessions:/app/auth_sessions
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "node", "-e", "require('http').get('http://localhost:3002/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - myfleet-network
+
+# ===========================================
+# Networks
+# ===========================================
+networks:
+  myfleet-network:
+    driver: bridge
+
+# ===========================================
+# Volumes (Persistent Data)
+# ===========================================
+volumes:
+  whatsapp_sessions:
+    driver: local
