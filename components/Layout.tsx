@@ -13,6 +13,7 @@ import { db } from '../lib/db';
 import { useTheme } from '../components/ThemeProvider';
 import { performGlobalLogout, isLogoutInProgress } from '../lib/authUtils';
 import { checkPermission as checkPlanPermission } from '../lib/planPermissionGuard';
+import { WhatsAppButton } from './WhatsAppButton';
 
 export interface LayoutContextType {
   user: Profile | null;
@@ -112,16 +113,16 @@ const Layout: React.FC = () => {
       }
     };
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    globalThis.addEventListener('online', handleOnline);
+    globalThis.addEventListener('offline', handleOffline);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     fetchUserData();
     fetchSystemConfig();
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      globalThis.removeEventListener('online', handleOnline);
+      globalThis.removeEventListener('offline', handleOffline);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
@@ -234,17 +235,6 @@ const Layout: React.FC = () => {
   const isNearExpiry = org ? (daysLeft >= 0 && daysLeft <= 3) : false;
   const isReadOnly = isFullyBlocked;
 
-  const checkPlanLimits = (module: keyof UserPermissions): boolean => {
-    if (!org || !systemConfig?.available_plans) return true;
-    const plan = systemConfig.available_plans.find(p => p.id === org.subscription_plan)
-      || systemConfig.available_plans.find(p => p.id === 'trial');
-
-    if (plan?.features) {
-      const feature = plan.features[module];
-      if (typeof feature === 'boolean' && feature === false) return false;
-    }
-    return true;
-  };
 
   const checkUserPermissions = (module: keyof UserPermissions, action?: string): boolean => {
     if (!userProfile?.permissions) return false;
@@ -328,6 +318,10 @@ const Layout: React.FC = () => {
               </Link>
             );
           })}
+          
+          <div className="pt-4 mt-4 border-t border-gray-100 dark:border-slate-800">
+            <WhatsAppButton variant="sidebar" />
+          </div>
         </nav>
 
         <div className="p-4 border-t border-gray-100 dark:border-slate-800">
@@ -458,6 +452,9 @@ const Layout: React.FC = () => {
                   {item.label}
                 </Link>
               ))}
+              <div className="pt-4 mt-4 border-t border-gray-100 dark:border-slate-800">
+                <WhatsAppButton variant="sidebar" />
+              </div>
             </nav>
           </div>
         </div>

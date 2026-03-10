@@ -332,7 +332,9 @@ const App: React.FC = () => {
         <ToastProvider>
           {/* <UpdateNotification /> Removed in favor of dashboard banner */}
           <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-            <WhatsAppButton />
+            {['/landing', '/pricing', '/login'].includes(globalThis.location.hash.replace('#', '')) && (
+              <WhatsAppButton />
+            )}
             <Suspense fallback={<PageLoader />}>
               <AnnouncementModal /> {/* Added globally */}
               <Routes>
