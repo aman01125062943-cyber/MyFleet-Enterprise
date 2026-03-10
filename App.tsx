@@ -322,8 +322,18 @@ const RootRedirect: React.FC = () => {
 // ====================================================================
 
 import { ThemeProvider } from './components/ThemeProvider';
+import { useLocation } from 'react-router-dom';
 
 const AnnouncementModal = React.lazy(() => import('./components/AnnouncementModal'));
+
+const WhatsAppButtonWrapper: React.FC = () => {
+  const location = useLocation();
+  // In HashRouter, location.pathname matches the route after the #
+  if (location.pathname === '/landing') {
+    return <WhatsAppButton />;
+  }
+  return null;
+};
 
 const App: React.FC = () => {
   return (
@@ -332,9 +342,7 @@ const App: React.FC = () => {
         <ToastProvider>
           {/* <UpdateNotification /> Removed in favor of dashboard banner */}
           <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-            {['/landing', '/pricing', '/login'].includes(globalThis.location.hash.replace('#', '')) && (
-              <WhatsAppButton />
-            )}
+            <WhatsAppButtonWrapper />
             <Suspense fallback={<PageLoader />}>
               <AnnouncementModal /> {/* Added globally */}
               <Routes>
