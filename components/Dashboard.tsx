@@ -6,8 +6,8 @@ import { Transaction, Plan } from '../types';
 import { LayoutContextType } from './Layout';
 import { db } from '../lib/db';
 import {
-    Activity,
-    Calendar, AlertTriangle, BarChart3, Crown
+    Activity, Calendar, AlertTriangle, BarChart3, Crown,
+    History, TrendingUp, TrendingDown
 } from 'lucide-react';
 import WelcomeModal from './WelcomeModal';
 
@@ -252,6 +252,65 @@ const Dashboard: React.FC = () => {
                     <StatCard title="وارد أسبوعي" amount={stats.weeklyIncome} type="income" />
                     <StatCard title="منصرف أسبوعي" amount={stats.weeklyExpense} type="expense" />
                     <StatCard title="صافي أسبوعي" amount={weeklyNet} type="net" />
+                </div>
+            </div>
+
+            {/* 3. RECENT TRANSACTIONS */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
+                <div className="p-4 md:p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
+                    <h3 className="font-bold text-sm md:text-lg text-slate-800 dark:text-white flex items-center gap-2">
+                        <History className="w-4 h-4 md:w-5 md:h-5 text-blue-500" /> آخر المعاملات
+                    </h3>
+                    <Link to="/financials" className="text-xs md:text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 transition-colors">
+                        عرض الكل
+                    </Link>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-right">
+                        <thead>
+                            <tr className="bg-slate-50 dark:bg-slate-900/50">
+                                <th className="px-4 py-3 text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">التاريخ</th>
+                                <th className="px-4 py-3 text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">النوع</th>
+                                <th className="px-4 py-3 text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">المبلغ</th>
+                                <th className="px-4 py-3 text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">السبب</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                            {stats.recentTx.length === 0 ? (
+                                <tr>
+                                    <td colSpan={4} className="px-4 py-8 text-center text-slate-400 text-xs md:text-sm italic">
+                                        لا توجد معاملات حديثة
+                                    </td>
+                                </tr>
+                            ) : (
+                                stats.recentTx.map((t) => (
+                                    <tr key={t.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50 transition-colors group">
+                                        <td className="px-4 py-3 text-xs md:text-sm text-slate-600 dark:text-slate-400">
+                                            {new Date(t.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                t.type === 'income' 
+                                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' 
+                                                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                            }`}>
+                                                {t.type === 'income' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                                                {t.type === 'income' ? 'وارد' : 'منصرف'}
+                                            </span>
+                                        </td>
+                                        <td className={`px-4 py-3 text-xs md:text-sm font-black ${
+                                            t.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+                                        }`}>
+                                            {t.amount?.toLocaleString()} {systemConfig?.currency || 'ج.م'}
+                                        </td>
+                                        <td className="px-4 py-3 text-xs md:text-sm text-slate-500 dark:text-slate-400 truncate max-w-[150px]">
+                                            {t.reason || '-'}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
