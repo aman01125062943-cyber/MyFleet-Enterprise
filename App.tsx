@@ -1,5 +1,5 @@
 import React, { useEffect, Suspense } from 'react';
-import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation, NavigateFunction } from 'react-router-dom';
 import { supabase } from './lib/supabaseClient';
 import { Loader2 } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -8,6 +8,7 @@ import { db } from './lib/db';
 import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute';
 import { performGlobalLogout } from './lib/authUtils';
 import { WhatsAppButton } from './components/WhatsAppButton';
+import { Profile } from './types';
 
 // Lazy Load Components for Performance Optimization
 const AuthScreen = React.lazy(() => import('./components/AuthScreen'));
@@ -20,11 +21,20 @@ const TripCalculator = React.lazy(() => import('./components/TripCalculator'));
 const SuperAdminDashboard = React.lazy(() => import('./components/SuperAdminDashboard'));
 const Assets = React.lazy(() => import('./components/Assets'));
 const Financials = React.lazy(() => import('./components/Financials'));
+const GlobalTrash = React.lazy(() => import('./components/GlobalTrash'));
 const LandingPage = React.lazy(() => import('./components/LandingPage'));
 const PricingPage = React.lazy(() => import('./components/PricingPage'));
 const SubscriptionRoute = React.lazy(() => import('./components/SubscriptionRoute'));
 const MaintenancePage = React.lazy(() => import('./components/MaintenancePage'));
 const UpdateRequiredPage = React.lazy(() => import('./components/UpdateRequiredPage'));
+const AnnouncementModal = React.lazy(() => import('./components/AnnouncementModal'));
+
+// Types
+interface SystemConfig {
+  maintenance_mode: boolean;
+  default_entry_page: 'landing' | 'pricing' | 'login';
+  min_app_version: string;
+}
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -80,7 +90,7 @@ const clearCache = () => {
 /**
  * Update cache with fresh data and current timestamp
  */
-const updateCache = (user: any) => {
+const updateCache = (user: Profile) => {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(user));
     localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
@@ -92,11 +102,11 @@ const updateCache = (user: any) => {
 /**
  * Fetch system configuration from Supabase
  */
-const fetchSystemConfig = async () => {
-  let systemConfig = {
+const fetchSystemConfig = async (): Promise<SystemConfig> => {
+  let systemConfig: SystemConfig = {
     maintenance_mode: false,
-    default_entry_page: 'login' as 'landing' | 'pricing' | 'login',
-    min_app_version: '1.0.0' as string
+    default_entry_page: 'login',
+    min_app_version: '1.0.0'
   };
 
   try {
@@ -121,15 +131,14 @@ const fetchSystemConfig = async () => {
 
 /**
  * Validates user status and maintenance mode, then navigates
- * Returns true if navigation was handled (user is valid or redirected due to maintenance/disabled)
  */
-const validateAndNavigateUser = (user: any, config: any, navigate: any) => {
+const validateAndNavigateUser = (user: Profile, config: SystemConfig, navigate: NavigateFunction) => {
   // SECURITY: Check if account is disabled
-  if (!user || user.status === 'disabled') {
+  if (user.status === 'disabled') {
     console.warn('⛔ Account is disabled, signing out');
     clearCache();
     performGlobalLogout({ reason: 'account_disabled' });
-    return true; // Handled (logged out)
+    return;
   }
 
   // MAINTENANCE MODE: Block non-admin users
@@ -139,25 +148,24 @@ const validateAndNavigateUser = (user: any, config: any, navigate: any) => {
       user.role !== 'owner') {
     console.warn('🔧 Maintenance mode active, blocking non-admin user');
     navigate('/maintenance', { replace: true });
-    return true; // Handled (redirected)
+    return;
   }
 
   // Session verified - update cache and proceed
   updateCache(user);
   navigate(user.role === 'admin' && !user.org_id ? '/admin' : '/dashboard', { replace: true });
-  return true; // Handled (redirected)
 };
 
 /**
  * Check for a valid cached session
  */
-const checkCachedSession = async () => {
+const checkCachedSession = async (): Promise<Profile | null> => {
   const cachedSession = localStorage.getItem(CACHE_KEY);
   const cacheTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
 
   if (cachedSession && cacheTimestamp) {
     try {
-      const user = JSON.parse(cachedSession);
+      const user = JSON.parse(cachedSession) as Profile;
       const cacheAge = Date.now() - Number.parseInt(cacheTimestamp, 10);
 
       if (user?.id && cacheAge < MAX_CACHE_AGE) {
@@ -167,7 +175,7 @@ const checkCachedSession = async () => {
         if (session?.user) {
           // SECURITY: Verify server session matches cached data
           const { data: profile } = await supabase.from('profiles')
-            .select('role, org_id, status')
+            .select('id, role, org_id, status, full_name, email, username, permissions')
             .eq('id', session.user.id)
             .maybeSingle();
           
@@ -190,7 +198,7 @@ const checkCachedSession = async () => {
 /**
  * Check for a valid online session
  */
-const checkOnlineSession = async () => {
+const checkOnlineSession = async (): Promise<Profile | null> => {
   if (navigator.onLine) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -198,7 +206,7 @@ const checkOnlineSession = async () => {
       if (session?.user) {
         // Fetch full profile with status check
         const { data: user } = await supabase.from('profiles')
-          .select('role, org_id, status, full_name, email, username, permissions')
+          .select('id, role, org_id, status, full_name, email, username, permissions')
           .eq('id', session.user.id)
           .maybeSingle();
         
@@ -214,7 +222,7 @@ const checkOnlineSession = async () => {
 /**
  * Check for offline session
  */
-const checkOfflineSession = async (config: any, navigate: any) => {
+const checkOfflineSession = async (config: SystemConfig, navigate: NavigateFunction) => {
   try {
     const sessions = await db.sessions.toArray();
 
@@ -275,19 +283,17 @@ const RootRedirect: React.FC = () => {
       // 1. Check localStorage first (FAST PATH)
       const cachedUser = await checkCachedSession();
       if (cachedUser) {
-        if (validateAndNavigateUser(cachedUser, config, navigate)) {
-          hasNavigated.current = true;
-          return;
-        }
+        validateAndNavigateUser(cachedUser, config, navigate);
+        hasNavigated.current = true;
+        return;
       }
 
       // 2. Online Check with Server Validation (PRIMARY PATH)
       const onlineUser = await checkOnlineSession();
       if (onlineUser) {
-        if (validateAndNavigateUser(onlineUser, config, navigate)) {
-          hasNavigated.current = true;
-          return;
-        }
+        validateAndNavigateUser(onlineUser, config, navigate);
+        hasNavigated.current = true;
+        return;
       }
 
       // 3. Offline Fallback Check (INDEXEDDB)
@@ -322,9 +328,6 @@ const RootRedirect: React.FC = () => {
 // ====================================================================
 
 import { ThemeProvider } from './components/ThemeProvider';
-import { useLocation } from 'react-router-dom';
-
-const AnnouncementModal = React.lazy(() => import('./components/AnnouncementModal'));
 
 const WhatsAppButtonWrapper: React.FC = () => {
   const location = useLocation();
@@ -377,12 +380,12 @@ const App: React.FC = () => {
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/inventory" element={<Inventory />} />
                   <Route path="/financials" element={<Financials />} />
+                  <Route path="/trash" element={<GlobalTrash />} />
                   <Route path="/team" element={<Team />} />
                   <Route path="/assets" element={<Assets />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/subscription" element={<SubscriptionRoute />} />
                   <Route path="/calculator" element={<TripCalculator />} />
-                  <Route path="/maintenance" element={<MaintenancePage />} />
                 </Route>
 
                 {/* Catch all */}

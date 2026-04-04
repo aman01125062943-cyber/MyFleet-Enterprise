@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useOutletContext, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
-import { Car, Transaction, ExpenseTemplate } from '../types';
+import { Car, Transaction, ExpenseTemplate, TransactionCategories, TransactionCategory } from '../types';
 import { LayoutContextType } from './Layout';
 import { db } from '../lib/db';
 import {
@@ -10,6 +10,196 @@ import {
     Edit, FileBarChart, Printer, PieChart, ShieldCheck, Lock, Loader2, Info,
     Download, Search, AlertTriangle, Gauge, CheckCircle, Filter, Calendar, ChevronDown
 } from 'lucide-react';
+
+// --- Sub-components ---
+
+const CarCard: React.FC<{
+    car: Car;
+    canEdit: boolean;
+    canDelete: boolean;
+    isReadOnly: boolean;
+    onOpenReport: (car: Car) => void;
+    onQuickAction: (carId: string, type: 'income' | 'expense') => void;
+    onEdit: (car: Car) => void;
+    onDelete: (carId: string) => void;
+}> = ({ car, canEdit, canDelete, isReadOnly, onOpenReport, onQuickAction, onEdit, onDelete }) => {
+    const isLicenseExpired = useMemo(() => car.license_expiry ? new Date(car.license_expiry) < new Date() : false, [car.license_expiry]);
+    const stats = car.stats || { total_income: 0, total_expense: 0, balance: 0 };
+
+    const getStatusClasses = (status: Car['status']) => {
+        switch (status) {
+            case 'active': return 'bg-emerald-100 text-emerald-700';
+            case 'maintenance': return 'bg-yellow-100 text-yellow-700';
+            case 'rented': return 'bg-blue-100 text-blue-700';
+            default: return 'bg-slate-100 text-slate-700';
+        }
+    };
+
+    const getStatusText = (status: Car['status']) => {
+        switch (status) {
+            case 'active': return 'نشطة';
+            case 'maintenance': return 'صيانة';
+            case 'rented': return 'مؤجرة';
+            default: return 'غير محدد';
+        }
+    };
+
+    const getLicenseExpiryContainerClasses = (isExpired: boolean) => {
+        return isExpired
+            ? 'bg-red-50 border-red-100 text-red-600 dark:bg-red-900/10 dark:border-red-900/30'
+            : 'bg-emerald-50 border-emerald-100 text-emerald-600 dark:bg-emerald-900/10 dark:border-emerald-900/30';
+    };
+
+    const getLicenseExpiryText = (isExpired: boolean) => isExpired ? 'منتهية' : 'سارية';
+    const getLicenseExpiryIcon = (isExpired: boolean) => isExpired ? <Info className="w-3 h-3" /> : <ShieldCheck className="w-3 h-3" />;
+
+    return (
+        <div className="bg-white dark:bg-[#1e293b] rounded-3xl border border-gray-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group flex flex-col relative">
+            <div className="h-2 w-full bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+
+            {/* Main Click Area */}
+            <button
+                className="p-5 flex-1 cursor-pointer w-full text-right" // Added w-full text-right for consistent styling
+                onClick={() => onOpenReport(car)}
+            >
+                <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-4">
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-2xl">
+                            <CarIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-xl text-slate-800 dark:text-white leading-tight">{car.make} {car.model}</h3>
+                            <div className="text-sm font-bold text-slate-500 mt-1">{car.year}</div>
+                        </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                        <div className="bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 font-mono tracking-wider border border-slate-200 dark:border-slate-600">
+                            {car.plate_number}
+                        </div>
+                        {/* Status Badge */}
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${getStatusClasses(car.status)}`}>
+                            {getStatusText(car.status)}
+                        </span>
+                    </div>
+                </div>
+
+                {/* Odometer Display */}
+                <div className="mb-4 flex items-center gap-2 text-xs font-bold text-slate-500 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg w-fit">
+                    <Gauge className="w-3 h-3 text-purple-500" />
+                    <span>العداد: {Number(car.current_odometer || 0).toLocaleString()} كم</span>
+                </div>
+
+                <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700 mb-4 grid grid-cols-3 gap-2 text-center">
+                    <div>
+                        <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mb-1">الوارد</div>
+                        <div className="font-bold text-slate-800 dark:text-white">{stats.total_income.toLocaleString()}</div>
+                    </div>
+                    <div className="border-x border-slate-200 dark:border-slate-700">
+                        <div className="text-[10px] text-red-500 font-bold mb-1">المنصرف</div>
+                        <div className="font-bold text-slate-800 dark:text-white">{stats.total_expense.toLocaleString()}</div>
+                    </div>
+                    <div>
+                        <div className="text-[10px] text-blue-500 font-bold mb-1">الباقي (الصافي)</div>
+                        <div className={`font-bold ${stats.balance >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-500'}`}>
+                            {stats.balance.toLocaleString()}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className={`p-3 rounded-xl border flex flex-col justify-center items-center text-center ${getLicenseExpiryContainerClasses(isLicenseExpired)}`}>
+                        <span className="text-[10px] font-bold opacity-80 mb-1">رخصة الربط</span>
+                        <div className="font-bold text-sm mb-1">{car.license_number || 'غير مسجل'}</div>
+                        <div className="flex items-center gap-1 font-bold text-[10px]">
+                            {getLicenseExpiryIcon(isLicenseExpired)}
+                            {getLicenseExpiryText(isLicenseExpired)}
+                        </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex flex-col justify-center">
+                        <div className="flex justify-between text-[10px] text-slate-500 mb-1">
+                            <span>المالك</span>
+                            <span className="font-bold">{car.owner_percentage}%</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mb-2">
+                            <div className="bg-blue-500 h-full" style={{ width: `${car.owner_percentage}%` }}></div>
+                        </div>
+                        <div className="flex justify-between text-[10px] text-slate-500 mb-1">
+                            <span>السائق</span>
+                            <span className="font-bold">{car.driver_percentage}%</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                            <div className="bg-emerald-500 h-full" style={{ width: `${car.driver_percentage}%` }}></div>
+                        </div>
+                    </div>
+                </div>
+            </button>
+
+            {/* Quick Actions */}
+            <div className="grid grid-cols-2 border-t border-gray-100 dark:border-slate-700 divide-x divide-x-reverse divide-gray-100 dark:divide-slate-700 relative z-10 bg-white dark:bg-[#1e293b]">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); if (!isReadOnly) onQuickAction(car.id, 'income'); }} 
+                  disabled={isReadOnly}
+                  className={`py-4 flex flex-col items-center justify-center gap-1 text-sm font-bold transition group/btn ${isReadOnly ? 'text-slate-400 opacity-50 cursor-not-allowed' : 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/10'}`}>
+                    <div className="flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 group-hover/btn:scale-110 transition-transform" /> تسجيل وارد
+                    </div>
+                    <span className="text-[10px] font-normal opacity-60">إضافة مبلغ</span>
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); onQuickAction(car.id, 'expense') }} className="py-4 flex flex-col items-center justify-center gap-1 text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 transition group/btn">
+                    <div className="flex items-center gap-2">
+                        <TrendingDown className="w-4 h-4 group-hover/btn:scale-110 transition-transform" /> تسجيل منصرف
+                    </div>
+                    <span className="text-[10px] text-red-600/60 font-normal">إضافة مبلغ</span>
+                </button>
+            </div>
+
+            {/* Footer (Actions) */}
+            <div className="px-5 py-3 bg-gray-50 dark:bg-slate-800/50 flex justify-between items-center border-t border-gray-100 dark:border-slate-700 relative z-10">
+                <button onClick={() => onOpenReport(car)} className="text-blue-600 hover:text-blue-700 text-xs font-bold flex items-center gap-1.5 transition hover:underline">
+                    <FileBarChart className="w-3.5 h-3.5" /> عرض التقرير الكامل
+                </button>
+
+                <div className="flex gap-2">
+                    {canEdit && (
+                        <button onClick={(e) => { e.stopPropagation(); onEdit(car) }} className="w-8 h-8 flex items-center justify-center rounded-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-400 hover:text-blue-500 hover:border-blue-500 transition shadow-sm relative z-20 cursor-pointer">
+                            <Edit className="w-4 h-4" />
+                        </button>
+                    )}
+                    {canDelete && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onDelete(car.id);
+                            }}
+                            className="w-8 h-8 flex items-center justify-center rounded-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-400 hover:text-red-500 hover:border-red-500 transition shadow-sm relative z-20 cursor-pointer"
+                            title="حذف السيارة"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const getCategoryColor = (type: string, id: string) => {
+    if (type === 'income') return 'emerald';
+    if (id.includes('fuel') || id === 'وقود') return 'orange';
+    if (id.includes('maintenance') || id === 'صيانة') return 'red';
+    if (id.includes('oil') || id === 'زيوت') return 'amber';
+    return 'blue';
+};
+
+const getCategoryIcon = (type: string, id: string) => {
+    if (id.includes('fuel') || id === 'وقود') return <Gauge className="w-5 h-5 text-orange-500" />;
+    if (id.includes('maintenance') || id === 'صيانة') return <AlertTriangle className="w-5 h-5 text-red-500" />;
+    if (id.includes('oil') || id === 'زيوت') return <TrendingDown className="w-5 h-5 text-amber-500" />;
+    if (type === 'income') return <TrendingUp className="w-5 h-5 text-emerald-500" />;
+    return <PieChart className="w-5 h-5 text-blue-500" />;
+};
 
 const Inventory: React.FC = () => {
     const location = useLocation();
@@ -41,7 +231,7 @@ const Inventory: React.FC = () => {
     };
 
     // Current Active Categories (Prioritize user settings, then org, then default)
-    const activeCategories = user?.settings?.transaction_categories || org?.settings?.transaction_categories || DEFAULT_CAT;
+    const activeCategories: TransactionCategories = user?.settings?.transaction_categories || org?.settings?.transaction_categories || DEFAULT_CAT;
 
     // UI States
     const [showAddCar, setShowAddCar] = useState(false);
@@ -65,7 +255,7 @@ const Inventory: React.FC = () => {
         current_odometer: 0, status: 'active'
     });
 
-    const [newCar, setNewCar] = useState({
+    const [newCar, setNewCar] = useState<Partial<Car>>({
         make: '', model: '', plate_number: '', year: '',
         license_number: '', license_expiry: '', owner_percentage: 100, driver_percentage: 0,
         current_odometer: 0, status: 'active'
@@ -82,7 +272,14 @@ const Inventory: React.FC = () => {
     // Transaction Editing State
     const [editingTxId, setEditingTxId] = useState<string | null>(null);
 
-    const [newTx, setNewTx] = useState({
+    const [newTx, setNewTx] = useState<{
+        car_id: string;
+        type: 'income' | 'expense';
+        amount: string;
+        category: string;
+        notes: string;
+        date: string;
+    }>({
         car_id: '',
         type: 'income' as 'income' | 'expense',
         amount: '',
@@ -107,7 +304,7 @@ const Inventory: React.FC = () => {
             if (targetCar) {
                 handleOpenReport(targetCar);
                 // Clear state to avoid reopening on refresh (optional, but good UX)
-                window.history.replaceState({}, '');
+                globalThis.history.replaceState({}, '');
             }
         }
     }, [location.state, cars]);
@@ -134,16 +331,16 @@ const Inventory: React.FC = () => {
         if (showLoad) setLoading(false);
     };
 
-    const getCategoryLabel = (type: 'income' | 'expense', id: string) => {
+    const getCategoryLabel = (type: 'income' | 'expense', id: string): string => {
         // 1. Try specified type first
-        const cats = (activeCategories as any)[type] || [];
-        const cat = cats.find((c: any) => c.id === id);
+        const cats = activeCategories[type] || [];
+        const cat = cats.find(c => c.id === id);
         if (cat) return cat.label;
 
         // 2. Fallback: Search in the other type (handles cases where type was incorrectly assigned)
         const otherType = type === 'income' ? 'expense' : 'income';
-        const otherCats = (activeCategories as any)[otherType] || [];
-        const otherCat = otherCats.find((c: any) => c.id === id);
+        const otherCats = activeCategories[otherType] || [];
+        const otherCat = otherCats.find(c => c.id === id);
         if (otherCat) return otherCat.label;
 
         // 3. Last fallback: return the original ID if not found
@@ -155,11 +352,13 @@ const Inventory: React.FC = () => {
         
         transactions.forEach(t => {
             const catId = t.category || 'other';
+            const type = t.type;
+            
             if (!summaries[catId]) {
                 summaries[catId] = {
                     id: catId,
-                    label: getCategoryLabel(t.type, catId),
-                    type: t.type,
+                    label: getCategoryLabel(type, catId),
+                    type: type,
                     amount: 0,
                     count: 0
                 };
@@ -171,56 +370,81 @@ const Inventory: React.FC = () => {
         return Object.values(summaries).sort((a, b) => b.amount - a.amount);
     };
 
+    const fetchCarsAndTransactions = async (orgId: string, controller: AbortController): Promise<{ carsData: Car[], txData: Transaction[] }> => {
+        if (navigator.onLine) {
+            const [carsResponse, txsResponse] = await Promise.all([
+                supabase.from('cars').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).abortSignal(controller.signal),
+                supabase.from('transactions').select('car_id, type, amount').eq('org_id', orgId).is('deleted_at', null).abortSignal(controller.signal)
+            ]);
+
+            if (carsResponse.error) throw carsResponse.error;
+            if (txsResponse.error) throw txsResponse.error;
+
+            const carsData = carsResponse.data as Car[] || [];
+            const txData = txsResponse.data as Transaction[] || [];
+
+            if (carsResponse.data) await db.cars.bulkPut(carsResponse.data);
+            return { carsData, txData };
+        } else {
+            const carsData = await db.cars.where('org_id').equals(orgId).reverse().toArray();
+            const txData = await db.transactions.where('org_id').equals(orgId).toArray();
+            return { carsData: (carsData as unknown as Car[]), txData: (txData as unknown as Transaction[]) };
+        }
+    };
+
+    const fetchExpenseTemplates = async (userId: string, controller: AbortController): Promise<ExpenseTemplate[]> => {
+        if (navigator.onLine) {
+            const { data } = await supabase.from('expense_templates').select('*').eq('user_id', userId).abortSignal(controller.signal);
+            return data as ExpenseTemplate[] || [];
+        } else {
+            return await db.expenseTemplates.where('user_id').equals(userId).toArray();
+        }
+    };
+
+    const calculateCarStats = (cars: Car[], transactions: Transaction[]): Car[] => {
+        return cars.map((c: Car) => {
+            const carTxs = transactions.filter((t: Transaction) => t.car_id === c.id) || [];
+            const income = carTxs.filter((t: Transaction) => t.type === 'income').reduce((sum: number, t: Transaction) => sum + Number(t.amount), 0);
+            const expense = carTxs.filter((t: Transaction) => t.type === 'expense').reduce((sum: number, t: Transaction) => sum + Number(t.amount), 0);
+
+            return {
+                ...c,
+                stats: {
+                    total_income: income,
+                    total_expense: expense,
+                    balance: income - expense
+                }
+            } as Car;
+        });
+    };
+
     const fetchData = async (orgId: string) => {
         if (!orgId || !user) return;
+        
+        const controller = new AbortController();
         setLoading(true);
 
-        let carsData: any[];
-        let txData: any[];
+        try {
+            const { carsData, txData } = await fetchCarsAndTransactions(orgId, controller);
+            const templatesData = await fetchExpenseTemplates(user.id, controller);
+            
+            setTemplates(templatesData);
 
-        if (navigator.onLine) {
-            // Fetch from Supabase
-            const { data: remoteCars } = await supabase.from('cars').select('*').eq('org_id', orgId).order('created_at', { ascending: false });
-            const { data: remoteTxs } = await supabase.from('transactions').select('car_id, type, amount').eq('org_id', orgId).is('deleted_at', null);
-
-            carsData = remoteCars || [];
-            txData = remoteTxs || [];
-
-            // Update Local Cache
-            if (remoteCars) await db.cars.bulkPut(remoteCars);
-        } else {
-            carsData = await db.cars.where('org_id').equals(orgId).reverse().toArray();
-            txData = await db.transactions.where('org_id').equals(orgId).toArray();
+            if (carsData) {
+                const carsWithStats = calculateCarStats(carsData, txData);
+                setCars(carsWithStats);
+            }
+        } catch (error: unknown) {
+            if (error instanceof Error && error.name === 'AbortError') {
+                console.log('Fetch aborted');
+            } else {
+                console.error('Error fetching data:', error);
+            }
+        } finally {
+            setLoading(false);
         }
 
-        // Fetch Templates
-        let templatesData: any[];
-        if (navigator.onLine) {
-            const { data } = await supabase.from('expense_templates').select('*').eq('user_id', user?.id);
-            templatesData = data || [];
-        } else {
-            templatesData = await db.expenseTemplates.where('user_id').equals(user.id).toArray();
-        }
-        setTemplates(templatesData);
-
-        if (carsData) {
-            const carsWithStats = carsData.map((c: any) => {
-                const carTxs = txData?.filter((t: any) => t.car_id === c.id) || [];
-                const income = carTxs.filter((t: any) => t.type === 'income').reduce((sum: number, t: any) => sum + Number(t.amount), 0);
-                const expense = carTxs.filter((t: any) => t.type === 'expense').reduce((sum: number, t: any) => sum + Number(t.amount), 0);
-
-                return {
-                    ...c,
-                    stats: {
-                        total_income: income,
-                        total_expense: expense,
-                        balance: income - expense
-                    }
-                } as Car;
-            });
-            setCars(carsWithStats);
-        }
-        setLoading(false);
+        return () => controller.abort();
     };
 
     // --- Handlers ---
@@ -269,11 +493,12 @@ const Inventory: React.FC = () => {
             name: `${newCar.make} ${newCar.model}`,
             current_odometer: Number(newCar.current_odometer || 0),
             status: newCar.status || 'active',
+            last_updated: Date.now(),
             created_at: new Date().toISOString()
         };
 
         // 1. Save to Local DB
-        await db.cars.add(carData as any);
+        await db.cars.add(carData);
 
         if (navigator.onLine) {
             // 2. Push to Supabase
@@ -316,11 +541,11 @@ const Inventory: React.FC = () => {
 
         setSaveLoading(false);
 
-        if (!error) {
+        if (error) {
+            console.error(error);
+        } else {
             setShowEditCar(false);
             if (user?.org_id) fetchData(user.org_id);
-        } else {
-            console.error(error);
         }
     };
 
@@ -352,13 +577,13 @@ const Inventory: React.FC = () => {
                     .eq('id', targetDeleteId)
                     .eq('org_id', user.org_id);
 
-                if (!error) {
+                if (error) {
+                    throw error;
+                } else {
                     setCars(prev => prev.filter(c => c.id !== targetDeleteId));
                     fetchData(user.org_id);
                     setShowDeleteModal(false);
                     setTargetDeleteId(null);
-                } else {
-                    throw error;
                 }
             } else if (deleteType === 'transaction') {
                 // Soft-Delete Transaction (Move to Trash)
@@ -366,7 +591,9 @@ const Inventory: React.FC = () => {
                     .update({ deleted_at: new Date().toISOString() })
                     .eq('id', targetDeleteId);
 
-                if (!error) {
+                if (error) {
+                    throw error;
+                } else {
                     if (selectedReportCar && showReportModal) {
                         await handleOpenReport(selectedReportCar, false);
                     }
@@ -375,11 +602,9 @@ const Inventory: React.FC = () => {
                     setTargetDeleteId(null);
                     setSuccessMsg('تم نقل السجل إلى سلة المهملات ✨');
                     setTimeout(() => setSuccessMsg(null), 3000);
-                } else {
-                    throw error;
                 }
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
         }
         setSaveLoading(false);
@@ -402,7 +627,7 @@ const Inventory: React.FC = () => {
 
     const handleEditTransaction = (tx: Transaction) => {
         if (isReadOnly) return;
-        setEditingTxId(tx.id);
+        setEditingTxId(tx.id || null);
         setNewTx({
             car_id: tx.car_id,
             type: tx.type,
@@ -433,7 +658,7 @@ const Inventory: React.FC = () => {
     };
 
     const confirmPermanentDelete = async (txId: string) => {
-        if (isReadOnly || !window.confirm('هل أنت متأكد من حذف هذا السجل نهائياً؟ لا يمكن التراجع!')) return;
+        if (isReadOnly || !globalThis.confirm('هل أنت متأكد من حذف هذا السجل نهائياً؟ لا يمكن التراجع!')) return;
         setSaveLoading(true);
         const { error } = await supabase.from('transactions').delete().eq('id', txId);
 
@@ -448,10 +673,20 @@ const Inventory: React.FC = () => {
         setSaveLoading(false);
     };
 
+    const handleRestoreTrashTransaction = async (txId: string) => {
+        await handleRestoreTransaction(txId);
+        setTrashTxs(prev => prev.filter(item => item.id !== txId));
+    };
+
+    const handlePermanentDeleteTrashTransaction = async (txId: string) => {
+        await confirmPermanentDelete(txId);
+        setTrashTxs(prev => prev.filter(item => item.id !== txId));
+    };
+
     const handleSaveTx = async (e: React.FormEvent) => {
         e.preventDefault();
         if (isReadOnly) return;
-        if (!user || !user.org_id) return;
+        if (!user?.org_id) return;
 
         setSaveLoading(true);
         const txId = editingTxId || crypto.randomUUID();
@@ -461,15 +696,16 @@ const Inventory: React.FC = () => {
             user_id: user.id,
             car_id: newTx.car_id,
             type: newTx.type,
-            amount: parseFloat(newTx.amount),
+            amount: Number.parseFloat(newTx.amount),
             category: newTx.category,
             notes: newTx.notes,
             date: newTx.date,
+            last_updated: Date.now(),
             created_at: new Date().toISOString()
         };
 
         // 1. Local Update
-        await db.transactions.put(txData as any);
+        await db.transactions.put(txData);
 
         if (navigator.onLine) {
             const { error } = await supabase.from('transactions').upsert(txData);
@@ -572,9 +808,9 @@ const Inventory: React.FC = () => {
         });
 
         // تطبيق فلتر نوع الحركة (وارد/منصرف/الكل)
-        const filteredTx = reportTxTypeFilter !== 'all'
-            ? yearTransactions.filter(t => t.type === reportTxTypeFilter)
-            : yearTransactions;
+        const filteredTx = reportTxTypeFilter === 'all'
+            ? yearTransactions
+            : yearTransactions.filter(t => t.type === reportTxTypeFilter);
 
         // تجميع الحركات حسب الشهر
         filteredTx.forEach(t => {
@@ -612,17 +848,16 @@ const Inventory: React.FC = () => {
             const sevenDaysAgo = new Date();
             sevenDaysAgo.setDate(today.getDate() - 7);
             filtered = filtered.filter(t => new Date(t.date) >= sevenDaysAgo);
-        } else if (reportFilterType === 'monthly') {
-            // فلتر الشهر: إذا تم اختيار شهر محدد، عرض حركات هذا الشهر فقط
-            if (selectedMonth !== null) {
+            if (selectedMonth === null) {
+                // عرض الشهر الحالي فقط
+                const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+                filtered = filtered.filter(t => new Date(t.date) >= startOfMonth);
+            } else {
+                // فلتر الشهر: إذا تم اختيار شهر محدد، عرض حركات هذا الشهر فقط
                 filtered = filtered.filter(t => {
                     const txDate = new Date(t.date);
                     return txDate.getFullYear() === selectedYear && txDate.getMonth() === selectedMonth;
                 });
-            } else {
-                // عرض الشهر الحالي فقط
-                const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-                filtered = filtered.filter(t => new Date(t.date) >= startOfMonth);
             }
         } else if (reportFilterType === 'yearly') {
             // فلتر السنة: عرض السنة المختارة
@@ -648,7 +883,7 @@ const Inventory: React.FC = () => {
             t.type === 'income' ? 'إيراد' : 'مصروف',
             getCategoryLabel(t.type, t.category || ''),
             t.amount,
-            `"${(t.notes || '').replace(/"/g, '""')}"`
+            `"${(t.notes || '').replaceAll('"', '""')}"`
         ]);
 
         const csvContent =
@@ -662,7 +897,7 @@ const Inventory: React.FC = () => {
         link.setAttribute('download', `statement_${selectedReportCar?.plate_number}_${new Date().toISOString().slice(0, 10)}.csv`);
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
+        link.remove();
     };
 
     // Filter Cars based on search
@@ -711,445 +946,65 @@ const Inventory: React.FC = () => {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-                    {filteredCars.map(car => {
-                        const isLicenseExpired = car.license_expiry && new Date(car.license_expiry) < new Date();
-                        const stats = car.stats || { total_income: 0, total_expense: 0, balance: 0 };
-
-                        return (
-                            <div key={car.id} className="bg-white dark:bg-[#1e293b] rounded-3xl border border-gray-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group flex flex-col relative">
-                                <div className="h-2 w-full bg-gradient-to-r from-blue-500 to-indigo-600"></div>
-
-                                {/* Main Click Area */}
-                                <div className="p-5 flex-1 cursor-pointer" onClick={() => handleOpenReport(car)}>
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-2xl">
-                                                <CarIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-                                            </div>
-                                            <div>
-                                                <h3 className="font-bold text-xl text-slate-800 dark:text-white leading-tight">{car.make} {car.model}</h3>
-                                                <div className="text-sm font-bold text-slate-500 mt-1">{car.year}</div>
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-col items-end gap-2">
-                                            <div className="bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-lg text-sm font-bold text-slate-600 dark:text-slate-300 font-mono tracking-wider border border-slate-200 dark:border-slate-600">
-                                                {car.plate_number}
-                                            </div>
-                                            {/* Status Badge */}
-                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${car.status === 'active' ? 'bg-emerald-100 text-emerald-700' :
-                                                car.status === 'maintenance' ? 'bg-yellow-100 text-yellow-700' :
-                                                    car.status === 'rented' ? 'bg-blue-100 text-blue-700' :
-                                                        'bg-slate-100 text-slate-700'
-                                                }`}>
-                                                {car.status === 'active' ? 'نشطة' :
-                                                    car.status === 'maintenance' ? 'صيانة' :
-                                                        car.status === 'rented' ? 'مؤجرة' : 'غير محدد'}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Odometer Display - Enterprise Feature */}
-                                    <div className="mb-4 flex items-center gap-2 text-xs font-bold text-slate-500 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg w-fit">
-                                        <Gauge className="w-3 h-3 text-purple-500" />
-                                        <span>العداد: {Number(car.current_odometer || 0).toLocaleString()} كم</span>
-                                    </div>
-
-                                    <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700 mb-4 grid grid-cols-3 gap-2 text-center">
-                                        <div>
-                                            <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mb-1">الوارد</div>
-                                            <div className="font-bold text-slate-800 dark:text-white">{stats.total_income.toLocaleString()}</div>
-                                        </div>
-                                        <div className="border-x border-slate-200 dark:border-slate-700">
-                                            <div className="text-[10px] text-red-500 font-bold mb-1">المنصرف</div>
-                                            <div className="font-bold text-slate-800 dark:text-white">{stats.total_expense.toLocaleString()}</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-[10px] text-blue-500 font-bold mb-1">الباقي (الصافي)</div>
-                                            <div className={`font-bold ${stats.balance >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-500'}`}>
-                                                {stats.balance.toLocaleString()}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-3 mb-4">
-                                        <div className={`p-3 rounded-xl border flex flex-col justify-center items-center text-center ${isLicenseExpired ? 'bg-red-50 border-red-100 text-red-600 dark:bg-red-900/10 dark:border-red-900/30' : 'bg-emerald-50 border-emerald-100 text-emerald-600 dark:bg-emerald-900/10 dark:border-emerald-900/30'}`}>
-                                            <span className="text-[10px] font-bold opacity-80 mb-1">رخصة الربط</span>
-                                            <div className="font-bold text-sm mb-1">{car.license_number || 'غير مسجل'}</div>
-                                            <div className="flex items-center gap-1 font-bold text-[10px]">
-                                                {isLicenseExpired ? <Info className="w-3 h-3" /> : <ShieldCheck className="w-3 h-3" />}
-                                                {isLicenseExpired ? 'منتهية' : 'سارية'}
-                                            </div>
-                                        </div>
-
-                                        <div className="p-3 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex flex-col justify-center">
-                                            <div className="flex justify-between text-[10px] text-slate-500 mb-1">
-                                                <span>المالك</span>
-                                                <span className="font-bold">{car.owner_percentage}%</span>
-                                            </div>
-                                            <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mb-2">
-                                                <div className="bg-blue-500 h-full" style={{ width: `${car.owner_percentage}%` }}></div>
-                                            </div>
-                                            <div className="flex justify-between text-[10px] text-slate-500 mb-1">
-                                                <span>السائق</span>
-                                                <span className="font-bold">{car.driver_percentage}%</span>
-                                            </div>
-                                            <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                                <div className="bg-emerald-500 h-full" style={{ width: `${car.driver_percentage}%` }}></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Quick Actions */}
-                                <div className="grid grid-cols-2 border-t border-gray-100 dark:border-slate-700 divide-x divide-x-reverse divide-gray-100 dark:divide-slate-700 relative z-10 bg-white dark:bg-[#1e293b]">
-                                    <button onClick={(e) => { e.stopPropagation(); handleQuickAction(car.id, 'income') }} className="py-4 flex flex-col items-center justify-center gap-1 text-sm font-bold text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition group/btn">
-                                        <div className="flex items-center gap-2">
-                                            <TrendingUp className="w-4 h-4 group-hover/btn:scale-110 transition-transform" /> تسجيل وارد
-                                        </div>
-                                        <span className="text-[10px] text-emerald-600/60 font-normal">إضافة مبلغ</span>
-                                    </button>
-                                    <button onClick={(e) => { e.stopPropagation(); handleQuickAction(car.id, 'expense') }} className="py-4 flex flex-col items-center justify-center gap-1 text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 transition group/btn">
-                                        <div className="flex items-center gap-2">
-                                            <TrendingDown className="w-4 h-4 group-hover/btn:scale-110 transition-transform" /> تسجيل منصرف
-                                        </div>
-                                        <span className="text-[10px] text-red-600/60 font-normal">إضافة مبلغ</span>
-                                    </button>
-                                </div>
-
-                                {/* Footer (Actions) */}
-                                <div className="px-5 py-3 bg-gray-50 dark:bg-slate-800/50 flex justify-between items-center border-t border-gray-100 dark:border-slate-700 relative z-10">
-                                    <button onClick={() => handleOpenReport(car)} className="text-blue-600 hover:text-blue-700 text-xs font-bold flex items-center gap-1.5 transition hover:underline">
-                                        <FileBarChart className="w-3.5 h-3.5" /> عرض التقرير الكامل
-                                    </button>
-
-                                    <div className="flex gap-2">
-                                        {canEditCar && (
-                                            <button onClick={(e) => { e.stopPropagation(); handleOpenEditCar(car) }} className="w-8 h-8 flex items-center justify-center rounded-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-400 hover:text-blue-500 hover:border-blue-500 transition shadow-sm relative z-20 cursor-pointer">
-                                                <Edit className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                        {canDeleteCar && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    e.preventDefault();
-                                                    initiateDeleteCar(car.id);
-                                                }}
-                                                className="w-8 h-8 flex items-center justify-center rounded-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-400 hover:text-red-500 hover:border-red-500 transition shadow-sm relative z-20 cursor-pointer"
-                                                title="حذف السيارة"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
+                    {filteredCars.map(car => (
+                        <CarCard
+                            key={car.id}
+                            car={car}
+                            canEdit={canEditCar || false}
+                            canDelete={canDeleteCar || false}
+                            isReadOnly={isReadOnly}
+                            onOpenReport={handleOpenReport}
+                            onQuickAction={handleQuickAction}
+                            onEdit={handleOpenEditCar}
+                            onDelete={initiateDeleteCar}
+                        />
+                    ))}
                 </div>
             )}
 
             {/* MODALS */}
 
             {/* 1. ADD / EDIT CAR MODAL */}
-            {(showAddCar || showEditCar) && (
-                <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
-                    onClick={(e) => {
-                        // Close on backdrop click
-                        if (e.target === e.currentTarget) {
-                            setShowAddCar(false);
-                            setShowEditCar(false);
-                        }
-                    }}
-                >
-                    <div className="bg-white dark:bg-[#1e293b] w-[95%] md:w-full max-w-lg rounded-3xl p-5 md:p-8 shadow-2xl border border-gray-200 dark:border-slate-700 animate-in zoom-in-95 my-auto relative">
-                        <button
-                            onClick={() => { setShowAddCar(false); setShowEditCar(false) }}
-                            className="absolute left-4 top-4 p-2 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 transition"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
-                        <h3 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white mb-6 border-b border-gray-100 dark:border-slate-700 pb-4 pr-2">
-                            {showEditCar ? 'تعديل بيانات السيارة' : 'إضافة سيارة جديدة'}
-                        </h3>
-                        <form onSubmit={showEditCar ? handleUpdateCar : handleAddCar} className="space-y-5">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 mb-1.5 block">الماركة</label>
-                                    <input required className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3.5 outline-none text-slate-800 dark:text-white focus:border-blue-500 font-bold" placeholder="مثال: Toyota"
-                                        value={showEditCar ? currentCar.make : newCar.make}
-                                        onChange={e => showEditCar ? setCurrentCar({ ...currentCar, make: e.target.value }) : setNewCar({ ...newCar, make: e.target.value })} />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 mb-1.5 block">الموديل</label>
-                                    <input required className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3.5 outline-none text-slate-800 dark:text-white focus:border-blue-500 font-bold" placeholder="مثال: Camry"
-                                        value={showEditCar ? currentCar.model : newCar.model}
-                                        onChange={e => showEditCar ? setCurrentCar({ ...currentCar, model: e.target.value }) : setNewCar({ ...newCar, model: e.target.value })} />
-                                </div>
-                            </div>
+            <AddEditCarModal
+                isOpen={showAddCar || showEditCar}
+                isEdit={showEditCar}
+                saveLoading={saveLoading}
+                car={showEditCar ? currentCar : newCar}
+                onCarChange={(updates) => {
+                    if (showEditCar) setCurrentCar({ ...currentCar, ...updates });
+                    else setNewCar({ ...newCar, ...updates });
+                }}
+                onClose={() => { setShowAddCar(false); setShowEditCar(false); }}
+                onSubmit={showEditCar ? handleUpdateCar : handleAddCar}
+            />
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 mb-1.5 block">رقم اللوحة</label>
-                                    <input required className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3.5 outline-none text-slate-800 dark:text-white focus:border-blue-500 font-bold text-center" placeholder="1234 ABC"
-                                        value={showEditCar ? currentCar.plate_number : newCar.plate_number}
-                                        onChange={e => showEditCar ? setCurrentCar({ ...currentCar, plate_number: e.target.value }) : setNewCar({ ...newCar, plate_number: e.target.value })} />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 mb-1.5 block">سنة الصنع</label>
-                                    <input required className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3.5 outline-none text-slate-800 dark:text-white focus:border-blue-500 font-bold text-center" placeholder="2024"
-                                        value={showEditCar ? currentCar.year : newCar.year}
-                                        onChange={e => showEditCar ? setCurrentCar({ ...currentCar, year: e.target.value }) : setNewCar({ ...newCar, year: e.target.value })} />
-                                </div>
-                            </div>
+            {/* 2. ADD / EDIT TRANSACTION MODAL */}
+            <AddEditTransactionModal
+                isOpen={showAddTx}
+                isEdit={!!editingTxId}
+                saveLoading={saveLoading}
+                tx={newTx as unknown as Partial<Transaction>}
+                cars={cars}
+                templates={templates}
+                activeCategories={activeCategories}
+                showCategoryDropdown={showCategoryDropdown}
+                setShowCategoryDropdown={setShowCategoryDropdown}
+                onTxChange={(updates) => setNewTx({ ...newTx, ...updates as any })}
+                onClose={() => setShowAddTx(false)}
+                onSave={handleSaveTx}
+                applyTemplate={applyTemplate}
+                getCategoryLabel={getCategoryLabel}
+                onEditCategories={(type) => setShowCatManager({ show: true, type })}
+            />
 
-                            {/* Status & Odometer (Enterprise) */}
-                            <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 mb-1.5 block">حالة السيارة</label>
-                                    <select className="w-full bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white text-sm font-bold"
-                                        value={showEditCar ? currentCar.status : newCar.status}
-                                        // @ts-ignore
-                                        onChange={e => showEditCar ? setCurrentCar({ ...currentCar, status: e.target.value }) : setNewCar({ ...newCar, status: e.target.value })}
-                                    >
-                                        <option value="active">نشطة (Active)</option>
-                                        <option value="maintenance">صيانة (Maintenance)</option>
-                                        <option value="rented">مؤجرة (Rented)</option>
-                                        <option value="out_of_service">خارج الخدمة</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 mb-1.5 block">عداد المسافات (كم)</label>
-                                    <input type="number" min="0" className="w-full bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white text-sm font-bold"
-                                        value={showEditCar ? (currentCar.current_odometer || 0) : (newCar.current_odometer || 0)}
-                                        onChange={e => showEditCar ? setCurrentCar({ ...currentCar, current_odometer: Number(e.target.value) }) : setNewCar({ ...newCar, current_odometer: Number(e.target.value) })} />
-                                </div>
-                            </div>
-
-                            <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
-                                <h4 className="text-xs font-bold text-blue-500 mb-4 flex items-center gap-1"><ShieldCheck className="w-4 h-4" /> بيانات الرخصة</h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500 mb-1.5 block">رقم الرخصة</label>
-                                        <input className="w-full bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white text-sm"
-                                            value={showEditCar ? currentCar.license_number : newCar.license_number}
-                                            onChange={e => showEditCar ? setCurrentCar({ ...currentCar, license_number: e.target.value }) : setNewCar({ ...newCar, license_number: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500 mb-1.5 block">تاريخ الانتهاء</label>
-                                        <input type="date" className="w-full bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white text-sm"
-                                            value={showEditCar ? (currentCar.license_expiry || '') : (newCar.license_expiry || '')}
-                                            onChange={e => showEditCar ? setCurrentCar({ ...currentCar, license_expiry: e.target.value }) : setNewCar({ ...newCar, license_expiry: e.target.value })} />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
-                                <h4 className="text-xs font-bold text-emerald-500 mb-4 flex items-center gap-1"><PieChart className="w-4 h-4" /> نسب الربح</h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500 mb-1.5 block">نسبة المالك %</label>
-                                        <div className="relative">
-                                            <input type="number" min="0" max="100" className="w-full bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white text-sm font-bold pl-8"
-                                                value={showEditCar ? currentCar.owner_percentage : newCar.owner_percentage}
-                                                onChange={e => {
-                                                    const val = parseFloat(e.target.value) || 0;
-                                                    if (showEditCar) setCurrentCar({ ...currentCar, owner_percentage: val, driver_percentage: 100 - val });
-                                                    else setNewCar({ ...newCar, owner_percentage: val, driver_percentage: 100 - val });
-                                                }} />
-                                            <span className="absolute left-3 top-3 text-slate-400 font-bold">%</span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500 mb-1.5 block">نسبة السائق % (تلقائي)</label>
-                                        <div className="relative">
-                                            <input type="number" readOnly className="w-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-500 dark:text-slate-400 text-sm font-bold cursor-not-allowed pl-8"
-                                                value={showEditCar ? currentCar.driver_percentage : newCar.driver_percentage} />
-                                            <span className="absolute left-3 top-3 text-slate-400 font-bold">%</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex gap-3 mt-8">
-                                <button type="button" onClick={() => { setShowAddCar(false); setShowEditCar(false) }} className="flex-1 py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl font-bold transition">إلغاء</button>
-                                <button type="submit" disabled={saveLoading} className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 transition">
-                                    {saveLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (showEditCar ? 'حفظ التعديلات' : 'إضافة السيارة')}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* 2. ADD / EDIT TRANSACTION MODAL (Updated Z-Index) */}
-            {showAddTx && (
-                <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-start sm:items-center justify-center p-4 overflow-y-auto pb-20 sm:pb-4"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) setShowAddTx(false);
-                    }}
-                >
-                    <div className="bg-white dark:bg-[#1e293b] w-[95%] md:w-full max-w-sm rounded-2xl p-5 md:p-6 shadow-2xl border border-gray-200 dark:border-slate-700 animate-in zoom-in-95 relative my-auto">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                                {newTx.type === 'income' ? <TrendingUp className="text-emerald-500" /> : <TrendingDown className="text-red-500" />}
-                                {editingTxId ? 'تعديل السجل' : (newTx.type === 'income' ? 'تسجيل إيراد' : 'تسجيل مصروف')}
-                            </h3>
-                            <button
-                                onClick={() => setShowAddTx(false)}
-                                className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                            >
-                                <X className="w-5 h-5 text-slate-400 hover:text-red-500" />
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleSaveTx} className="space-y-4">
-                            <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700 text-center">
-                                <span className="text-xs text-slate-500 block mb-1">السيارة المحددة</span>
-                                <span className="font-bold text-slate-800 dark:text-white">
-                                    {cars.find(c => c.id === newTx.car_id)?.make} {cars.find(c => c.id === newTx.car_id)?.model}
-                                </span>
-                            </div>
-
-                            {/* Quick Templates Section */}
-                            {templates.filter(t => t.is_active && (t.type === newTx.type || (!t.type && newTx.type === 'expense'))).length > 0 && (
-                                <div className="mb-4">
-                                    <label className="text-xs font-bold text-slate-500 mb-2 block flex items-center gap-1">
-                                        <span className={`w-1.5 h-1.5 rounded-full ${newTx.type === 'income' ? 'bg-emerald-500' : 'bg-red-500'} inline-block`}></span>
-                                        {newTx.type === 'income' ? 'إيرادات جاهزة (اختر للتعبئة)' : 'مصروفات جاهزة (اختر للتعبئة)'}
-                                    </label>
-                                    <div className="flex flex-wrap gap-2">
-                                        {templates.filter(t => t.is_active && (t.type === newTx.type || (!t.type && newTx.type === 'expense'))).map(t => (
-                                            <button
-                                                key={t.id}
-                                                type="button"
-                                                onClick={() => applyTemplate(t)}
-                                                className="px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 hover:shadow-sm transition active:scale-95"
-                                            >
-                                                {t.title} <span className="opacity-60 text-[10px] pr-1">({t.amount})</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 mb-1 block">المبلغ</label>
-                                    <input type="number" required min="0" step="0.01" className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white font-bold focus:border-blue-500" placeholder="0.00" value={newTx.amount} onChange={e => setNewTx({ ...newTx, amount: e.target.value })} />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 mb-1 block">التاريخ</label>
-                                    <input type="date" required className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white focus:border-blue-500" value={newTx.date} onChange={e => setNewTx({ ...newTx, date: e.target.value })} />
-                                </div>
-                            </div>
-
-                            <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <label className="text-xs font-bold text-slate-500 block">التصنيف</label>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowCatManager({ show: true, type: newTx.type });
-                                        }}
-                                        className="text-[10px] font-bold text-blue-500 flex items-center gap-1 hover:underline"
-                                    >
-                                        <Edit className="w-2.5 h-2.5" /> تعديل القائمة
-                                    </button>
-                                </div>
-                                <div className="relative">
-                                    <div className="flex items-center">
-                                        <input
-                                            type="text"
-                                            className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-r-xl p-3 outline-none text-slate-800 dark:text-white focus:border-blue-500 font-bold"
-                                            placeholder="اختر أو اكتب..."
-                                            value={getCategoryLabel(newTx.type, newTx.category)}
-                                            onChange={e => setNewTx({ ...newTx, category: e.target.value })}
-                                            onFocus={() => setShowCategoryDropdown(true)}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                                            className="px-3 py-3.5 bg-slate-100 dark:bg-slate-800 border-y border-l border-gray-200 dark:border-slate-700 rounded-l-xl text-slate-500 hover:text-blue-500 transition"
-                                        >
-                                            <ChevronDown className={`w-5 h-5 transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
-                                        </button>
-                                    </div>
-
-                                    {showCategoryDropdown && (
-                                        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#1e293b] border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto">
-                                            {(activeCategories as any)[newTx.type].length > 0 ? (
-                                                (activeCategories as any)[newTx.type].map((cat: any) => (
-                                                    <button
-                                                        key={cat.id}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setNewTx({ ...newTx, category: cat.id });
-                                                            setShowCategoryDropdown(false);
-                                                        }}
-                                                        className="w-full text-right px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 border-b border-gray-50 dark:border-slate-700/50 last:border-0 transition"
-                                                    >
-                                                        {cat.label}
-                                                    </button>
-                                                ))
-                                            ) : (
-                                                <div className="p-4 text-center text-xs text-slate-400">لا توجد تصنيفات، اكتب يدوياً</div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 mb-1 block">ملاحظات</label>
-                                <textarea className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white h-20 focus:border-blue-500" placeholder="تفاصيل إضافية..." value={newTx.notes} onChange={e => setNewTx({ ...newTx, notes: e.target.value })}></textarea>
-                            </div>
-
-                            <button disabled={saveLoading} className={`w-full py-3 rounded-xl font-bold text-white shadow-lg flex items-center justify-center gap-2 ${newTx.type === 'income' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500'}`}>
-                                {saveLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                                {editingTxId ? 'حفظ التعديلات' : (newTx.type === 'income' ? 'حفظ الإيراد' : 'حفظ المصروف')}
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* 3. DELETE CONFIRMATION MODAL (Updated Z-Index & Logic) */}
-            {showDeleteModal && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-[#1e293b] w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-gray-200 dark:border-slate-700 animate-in zoom-in-95">
-                        <div className="flex flex-col items-center text-center">
-                            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4">
-                                <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-500" />
-                            </div>
-                            <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">تأكيد الحذف</h3>
-                            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6 leading-relaxed">
-                                {deleteType === 'car' ? (
-                                    <>
-                                        هل أنت متأكد تماماً من حذف هذه السيارة؟ <br />
-                                        <span className="text-red-500 font-bold">سيتم حذف جميع السجلات المالية (الوارد والمنصرف) المرتبطة بها نهائياً ولا يمكن التراجع عن هذا الإجراء.</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        هل أنت متأكد من حذف هذا السجل المالي؟ <br />
-                                        <span className="text-red-500 font-bold">لا يمكن التراجع عن هذا الإجراء.</span>
-                                    </>
-                                )}
-                            </p>
-                            <div className="flex gap-3 w-full">
-                                <button onClick={() => setShowDeleteModal(false)} className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition">
-                                    إلغاء
-                                </button>
-                                <button onClick={confirmDelete} disabled={saveLoading} className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold shadow-lg shadow-red-900/20 flex items-center justify-center gap-2 transition">
-                                    {saveLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'نعم، حذف'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* 3. DELETE CONFIRMATION MODAL */}
+            <DeleteConfirmationModal
+                isOpen={showDeleteModal}
+                saveLoading={saveLoading}
+                deleteType={deleteType}
+                onClose={() => setShowDeleteModal(false)}
+                onConfirm={confirmDelete}
+            />
 
             {/* 4. FULL SCREEN REPORT & LEDGER (Updated Print Styles) */}
             {showReportModal && selectedReportCar && (
@@ -1262,7 +1117,7 @@ const Inventory: React.FC = () => {
                                     <button onClick={() => handleExportExcel(getFilteredTransactions())} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow hover:shadow-lg transition">
                                         <Download className="w-3.5 h-3.5" /> Excel
                                     </button>
-                                    <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow hover:shadow-lg transition">
+                                    <button onClick={() => globalThis.print()} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow hover:shadow-lg transition">
                                         <Printer className="w-3.5 h-3.5" /> طباعة
                                     </button>
                                     <button 
@@ -1313,8 +1168,8 @@ const Inventory: React.FC = () => {
                                 totalExpense = monthlyData.reduce((sum, m) => sum + m.expense, 0);
                             } else {
                                 // العرض العادي (يومي/أسبوعي/شهري/مخصص)
-                                totalIncome = filteredHist.filter((t: any) => t.type === 'income').reduce((sum: number, t: any) => sum + Number(t.amount), 0);
-                                totalExpense = filteredHist.filter((t: any) => t.type === 'expense').reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+                                totalIncome = filteredHist.filter((t: Transaction) => t.type === 'income').reduce((sum: number, t: Transaction) => sum + Number(t.amount), 0);
+                                totalExpense = filteredHist.filter((t: Transaction) => t.type === 'expense').reduce((sum: number, t: Transaction) => sum + Number(t.amount), 0);
                             }
 
                             const netProfit = totalIncome - totalExpense;
@@ -1445,10 +1300,7 @@ const Inventory: React.FC = () => {
                                                 {getCategorySummaries(filteredHist).map((sum) => {
                                                     const maxAmount = Math.max(...getCategorySummaries(filteredHist).map(s => s.amount));
                                                     const percentage = (sum.amount / maxAmount) * 100;
-                                                    const colorClass = sum.type === 'income' ? 'emerald' : 
-                                                                     (sum.id.includes('fuel') || sum.id === 'وقود' ? 'orange' : 
-                                                                     (sum.id.includes('maintenance') || sum.id === 'صيانة' ? 'red' : 
-                                                                     (sum.id.includes('oil') || sum.id === 'زيوت' ? 'amber' : 'blue')));
+                                                    const colorClass = getCategoryColor(sum.type, sum.id);
                                                     
                                                     return (
                                                         <div key={sum.id} className="bg-white dark:bg-[#1e293b] p-6 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
@@ -1456,11 +1308,7 @@ const Inventory: React.FC = () => {
                                                             <div className="relative z-10">
                                                                 <div className="flex justify-between items-start mb-4">
                                                                     <div className={`p-3 bg-${colorClass}-50 dark:bg-${colorClass}-900/20 rounded-2xl`}>
-                                                                        {sum.id.includes('fuel') || sum.id === 'وقود' ? <Gauge className="w-5 h-5 text-orange-500" /> : 
-                                                                         sum.id.includes('maintenance') || sum.id === 'صيانة' ? <AlertTriangle className="w-5 h-5 text-red-500" /> : 
-                                                                         sum.id.includes('oil') || sum.id === 'زيوت' ? <TrendingDown className="w-5 h-5 text-amber-500" /> :
-                                                                         sum.type === 'income' ? <TrendingUp className="w-5 h-5 text-emerald-500" /> : 
-                                                                         <PieChart className="w-5 h-5 text-blue-500" />}
+                                                                        {getCategoryIcon(sum.type, sum.id)}
                                                                     </div>
                                                                     <div className="text-right">
                                                                         <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1">
@@ -1561,7 +1409,7 @@ const Inventory: React.FC = () => {
                                                                     <button onClick={() => handleEditTransaction(t)} className="p-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 hover:bg-blue-100 rounded transition" title="تعديل">
                                                                         <Edit className="w-4 h-4" />
                                                                     </button>
-                                                                    <button onClick={() => initiateDeleteTransaction(t.id)} className="p-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 hover:bg-red-100 rounded transition" title="حذف">
+                                                                    <button onClick={() => initiateDeleteTransaction(t.id!)} className="p-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 hover:bg-red-100 rounded transition" title="حذف">
                                                                         <Trash2 className="w-4 h-4" />
                                                                     </button>
                                                                 </td>
@@ -1617,7 +1465,7 @@ const Inventory: React.FC = () => {
                                                                     <Edit className="w-3 h-3" /> تعديل
                                                                 </button>
                                                                 <button
-                                                                    onClick={(e) => { e.stopPropagation(); initiateDeleteTransaction(t.id); }}
+                                                                    onClick={(e) => { e.stopPropagation(); initiateDeleteTransaction(t.id!); }}
                                                                     className="flex items-center gap-1 text-[10px] bg-red-50 text-red-600 px-2.5 py-1.5 rounded-lg font-bold"
                                                                 >
                                                                     <Trash2 className="w-3 h-3" /> حذف
@@ -1675,19 +1523,13 @@ const Inventory: React.FC = () => {
                                                                     <td className="p-4 text-left font-bold font-mono">{Number(t.amount).toLocaleString()}</td>
                                                                     <td className="p-4 flex justify-center gap-2">
                                                                         <button 
-                                                                            onClick={async () => {
-                                                                                await handleRestoreTransaction(t.id);
-                                                                                setTrashTxs(prev => prev.filter(item => item.id !== t.id));
-                                                                            }} 
+                                                                            onClick={() => handleRestoreTrashTransaction(t.id!)} 
                                                                             className="px-3 py-1 bg-blue-600 text-white rounded-lg text-[10px] font-bold shadow-md hover:bg-blue-500 transition"
                                                                         >
                                                                             استعادة
                                                                         </button>
                                                                         <button 
-                                                                            onClick={async () => {
-                                                                                await confirmPermanentDelete(t.id);
-                                                                                setTrashTxs(prev => prev.filter(item => item.id !== t.id));
-                                                                            }} 
+                                                                            onClick={() => handlePermanentDeleteTrashTransaction(t.id!)} 
                                                                             className="p-1 px-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition" 
                                                                             title="حذف نهائي"
                                                                         >
@@ -1749,9 +1591,9 @@ const Inventory: React.FC = () => {
 // Sub-component for Category Management to avoid Lag
 const CategoryManagerModal: React.FC<{
     type: 'income' | 'expense';
-    initialCats: { id: string, label: string }[];
+    initialCats: TransactionCategory[];
     onClose: () => void;
-    onSave: (cats: { id: string, label: string }[]) => Promise<void>;
+    onSave: (cats: TransactionCategory[]) => Promise<void>;
 }> = ({ type, initialCats, onClose, onSave }) => {
     const [cats, setCats] = React.useState(initialCats);
     const [saving, setSaving] = React.useState(false);
@@ -1824,4 +1666,348 @@ const CategoryManagerModal: React.FC<{
 };
 
 
+// --- Sub-components for Modals ---
+
+interface AddEditCarModalProps {
+    isOpen: boolean;
+    isEdit: boolean;
+    saveLoading: boolean;
+    car: Partial<Car>;
+    onCarChange: (updates: Partial<Car>) => void;
+    onClose: () => void;
+    onSubmit: (e: React.FormEvent) => void;
+}
+
+const AddEditCarModal: React.FC<AddEditCarModalProps> = ({
+    isOpen, isEdit, saveLoading, car, onCarChange, onClose, onSubmit
+}) => {
+    if (!isOpen) return null;
+
+    return (
+        <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+            onClick={(e) => e.target === e.currentTarget && onClose()}
+        >
+            <div className="bg-white dark:bg-[#1e293b] w-[95%] md:w-full max-w-lg rounded-3xl p-5 md:p-8 shadow-2xl border border-gray-200 dark:border-slate-700 animate-in zoom-in-95 my-auto relative">
+                <button
+                    onClick={onClose}
+                    className="absolute left-4 top-4 p-2 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 transition"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+                <h3 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white mb-6 border-b border-gray-100 dark:border-slate-700 pb-4 pr-2">
+                    {isEdit ? 'تعديل بيانات السيارة' : 'إضافة سيارة جديدة'}
+                </h3>
+                <form onSubmit={onSubmit} className="space-y-5">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 mb-1.5 block">الماركة</label>
+                            <input required className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3.5 outline-none text-slate-800 dark:text-white focus:border-blue-500 font-bold" placeholder="مثال: Toyota"
+                                value={car.make || ''}
+                                onChange={e => onCarChange({ make: e.target.value })} />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 mb-1.5 block">الموديل</label>
+                            <input required className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3.5 outline-none text-slate-800 dark:text-white focus:border-blue-500 font-bold" placeholder="مثال: Camry"
+                                value={car.model || ''}
+                                onChange={e => onCarChange({ model: e.target.value })} />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 mb-1.5 block">رقم اللوحة</label>
+                            <input required className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3.5 outline-none text-slate-800 dark:text-white focus:border-blue-500 font-bold text-center" placeholder="1234 ABC"
+                                value={car.plate_number || ''}
+                                onChange={e => onCarChange({ plate_number: e.target.value })} />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 mb-1.5 block">سنة الصنع</label>
+                            <input required className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3.5 outline-none text-slate-800 dark:text-white focus:border-blue-500 font-bold text-center" placeholder="2024"
+                                value={car.year || ''}
+                                onChange={e => onCarChange({ year: e.target.value })} />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 mb-1.5 block">حالة السيارة</label>
+                            <select className="w-full bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white text-sm font-bold"
+                                value={car.status || 'active'}
+                                // @ts-expect-error - value is a string from event
+                                onChange={e => onCarChange({ status: e.target.value })}
+                            >
+                                <option value="active">نشطة (Active)</option>
+                                <option value="maintenance">صيانة (Maintenance)</option>
+                                <option value="rented">مؤجرة (Rented)</option>
+                                <option value="out_of_service">خارج الخدمة</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 mb-1.5 block">عداد المسافات (كم)</label>
+                            <input type="number" min="0" className="w-full bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white text-sm font-bold"
+                                value={car.current_odometer || 0}
+                                onChange={e => onCarChange({ current_odometer: Number(e.target.value) })} />
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+                        <h4 className="text-xs font-bold text-blue-500 mb-4 flex items-center gap-1"><ShieldCheck className="w-4 h-4" /> بيانات الرخصة</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 mb-1.5 block">رقم الرخصة</label>
+                                <input className="w-full bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white text-sm"
+                                    value={car.license_number || ''}
+                                    onChange={e => onCarChange({ license_number: e.target.value })} />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 mb-1.5 block">تاريخ الانتهاء</label>
+                                <input type="date" className="w-full bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white text-sm"
+                                    value={car.license_expiry || ''}
+                                    onChange={e => onCarChange({ license_expiry: e.target.value })} />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+                        <h4 className="text-xs font-bold text-emerald-500 mb-4 flex items-center gap-1"><PieChart className="w-4 h-4" /> نسب الربح</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 mb-1.5 block">نسبة المالك %</label>
+                                <div className="relative">
+                                    <input type="number" min="0" max="100" className="w-full bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white text-sm font-bold pl-8"
+                                        value={car.owner_percentage || 100}
+                                        onChange={e => {
+                                            const val = parseFloat(e.target.value) || 0;
+                                            onCarChange({ owner_percentage: val, driver_percentage: 100 - val });
+                                        }} />
+                                    <span className="absolute left-3 top-3 text-slate-400 font-bold">%</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 mb-1.5 block">نسبة السائق % (تلقائي)</label>
+                                <div className="relative">
+                                    <input type="number" readOnly className="w-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-500 dark:text-slate-400 text-sm font-bold cursor-not-allowed pl-8"
+                                        value={car.driver_percentage || 0} />
+                                    <span className="absolute left-3 top-3 text-slate-400 font-bold">%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-3 mt-8">
+                        <button type="button" onClick={onClose} className="flex-1 py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl font-bold transition">إلغاء</button>
+                        <button type="submit" disabled={saveLoading} className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 transition">
+                            {saveLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isEdit ? 'حفظ التعديلات' : 'إضافة السيارة')}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+interface AddEditTransactionModalProps {
+    isOpen: boolean;
+    isEdit: boolean;
+    saveLoading: boolean;
+    tx: Partial<Transaction>;
+    cars: Car[];
+    templates: ExpenseTemplate[];
+    activeCategories: TransactionCategories;
+    showCategoryDropdown: boolean;
+    setShowCategoryDropdown: (show: boolean) => void;
+    onTxChange: (updates: Partial<Transaction>) => void;
+    onClose: () => void;
+    onSave: (e: React.FormEvent) => void;
+    applyTemplate: (t: ExpenseTemplate) => void;
+    getCategoryLabel: (type: 'income' | 'expense', id: string) => string;
+    onEditCategories: (type: 'income' | 'expense') => void;
+}
+
+const AddEditTransactionModal: React.FC<AddEditTransactionModalProps> = ({
+    isOpen, isEdit, saveLoading, tx, cars, templates, activeCategories,
+    showCategoryDropdown, setShowCategoryDropdown, onTxChange, onClose, onSave,
+    applyTemplate, getCategoryLabel, onEditCategories
+}) => {
+    if (!isOpen) return null;
+
+    return (
+        <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-start sm:items-center justify-center p-4 overflow-y-auto pb-20 sm:pb-4"
+            onClick={(e) => e.target === e.currentTarget && onClose()}
+        >
+            <div className="bg-white dark:bg-[#1e293b] w-[95%] md:w-full max-w-sm rounded-2xl p-5 md:p-6 shadow-2xl border border-gray-200 dark:border-slate-700 animate-in zoom-in-95 relative my-auto">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                        {tx.type === 'income' ? <TrendingUp className="text-emerald-500" /> : <TrendingDown className="text-red-500" />}
+                        {isEdit ? 'تعديل السجل' : (tx.type === 'income' ? 'تسجيل إيراد' : 'تسجيل مصروف')}
+                    </h3>
+                    <button
+                        onClick={onClose}
+                        className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                    >
+                        <X className="w-5 h-5 text-slate-400 hover:text-red-500" />
+                    </button>
+                </div>
+
+                <form onSubmit={onSave} className="space-y-4">
+                    <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700 text-center">
+                        <span className="text-xs text-slate-500 block mb-1">السيارة المحددة</span>
+                        <span className="font-bold text-slate-800 dark:text-white">
+                            {cars.find(c => c.id === tx.car_id)?.make} {cars.find(c => c.id === tx.car_id)?.model}
+                        </span>
+                    </div>
+
+                    {/* Quick Templates Section */}
+                    {templates.some(t => t.is_active && (t.type === tx.type || (!t.type && tx.type === 'expense'))) && (
+                        <div className="mb-4">
+                            <label className="text-xs font-bold text-slate-500 mb-2 block flex items-center gap-1">
+                                <span className={`w-1.5 h-1.5 rounded-full ${tx.type === 'income' ? 'bg-emerald-500' : 'bg-red-500'} inline-block`}></span>
+                                {tx.type === 'income' ? 'إيرادات جاهزة (اختر للتعبئة)' : 'مصروفات جاهزة (اختر للتعبئة)'}
+                            </label>
+                            <div className="flex flex-wrap gap-2">
+                                {templates.filter(t => t.is_active && (t.type === tx.type || (!t.type && tx.type === 'expense'))).map(t => (
+                                    <button
+                                        key={t.id}
+                                        type="button"
+                                        onClick={() => applyTemplate(t)}
+                                        className="px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 hover:shadow-sm transition active:scale-95"
+                                    >
+                                        {t.title} <span className="opacity-60 text-[10px] pr-1">({t.amount})</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 mb-1 block">المبلغ</label>
+                            <input type="number" required min="0" step="0.01" className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white font-bold focus:border-blue-500" placeholder="0.00" value={tx.amount || ''} onChange={e => onTxChange({ amount: e.target.value as any })} />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 mb-1 block">التاريخ</label>
+                            <input type="date" required className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white focus:border-blue-500" value={tx.date || ''} onChange={e => onTxChange({ date: e.target.value })} />
+                        </div>
+                    </div>
+
+                    <div>
+                        <div className="flex justify-between items-center mb-1">
+                            <label className="text-xs font-bold text-slate-500 block">التصنيف</label>
+                            <button
+                                type="button"
+                                onClick={() => onEditCategories(tx.type as 'income' | 'expense')}
+                                className="text-[10px] font-bold text-blue-500 flex items-center gap-1 hover:underline"
+                            >
+                                <Edit className="w-2.5 h-2.5" /> تعديل القائمة
+                            </button>
+                        </div>
+                        <div className="relative">
+                            <div className="flex items-center">
+                                <input
+                                    type="text"
+                                    className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-r-xl p-3 outline-none text-slate-800 dark:text-white focus:border-blue-500 font-bold"
+                                    placeholder="اختر أو اكتب..."
+                                    value={getCategoryLabel(tx.type as 'income' | 'expense', tx.category || '')}
+                                    onChange={e => onTxChange({ category: e.target.value })}
+                                    onFocus={() => setShowCategoryDropdown(true)}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                                    className="px-3 py-3.5 bg-slate-100 dark:bg-slate-800 border-y border-l border-gray-200 dark:border-slate-700 rounded-l-xl text-slate-500 hover:text-blue-500 transition"
+                                >
+                                    <ChevronDown className={`w-5 h-5 transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
+                                </button>
+                            </div>
+
+                            {showCategoryDropdown && (
+                                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#1e293b] border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto">
+                                    {(tx.type === 'income' ? activeCategories.income : activeCategories.expense).length > 0 ? (
+                                        (tx.type === 'income' ? activeCategories.income : activeCategories.expense).map((cat) => (
+                                            <button
+                                                key={cat.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    onTxChange({ category: cat.id });
+                                                    setShowCategoryDropdown(false);
+                                                }}
+                                                className="w-full text-right px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 border-b border-gray-50 dark:border-slate-700/50 last:border-0 transition"
+                                            >
+                                                {cat.label}
+                                            </button>
+                                        ))
+                                    ) : (
+                                        <div className="p-4 text-center text-xs text-slate-400">لا توجد تصنيفات، اكتب يدوياً</div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 mb-1 block">ملاحظات</label>
+                        <textarea className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white h-20 focus:border-blue-500" placeholder="تفاصيل إضافية..." value={tx.notes || ''} onChange={e => onTxChange({ notes: e.target.value })}></textarea>
+                    </div>
+
+                    <button disabled={saveLoading} className={`w-full py-3 rounded-xl font-bold text-white shadow-lg flex items-center justify-center gap-2 ${tx.type === 'income' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500'}`}>
+                        {saveLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                        {isEdit ? 'حفظ التعديلات' : (tx.type === 'income' ? 'حفظ الإيراد' : 'حفظ المصروف')}
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+
 export default Inventory;
+
+interface DeleteConfirmationModalProps {
+    isOpen: boolean;
+    saveLoading: boolean;
+    deleteType: 'car' | 'transaction';
+    onClose: () => void;
+    onConfirm: () => void;
+}
+
+const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
+    isOpen, saveLoading, deleteType, onClose, onConfirm
+}) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-[#1e293b] w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-gray-200 dark:border-slate-700 animate-in zoom-in-95">
+                <div className="flex flex-col items-center text-center">
+                    <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4">
+                        <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-500" />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">تأكيد الحذف</h3>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm mb-6 leading-relaxed">
+                        {deleteType === 'car' ? (
+                            <>
+                                هل أنت متأكد تماماً من حذف هذه السيارة؟ <br />
+                                <span className="text-red-500 font-bold">سيتم حذف جميع السجلات المالية (الوارد والمنصرف) المرتبطة بها نهائياً ولا يمكن التراجع عن هذا الإجراء.</span>
+                            </>
+                        ) : (
+                            <>
+                                هل أنت متأكد من حذف هذا السجل المالي؟ <br />
+                                <span className="text-red-500 font-bold">لا يمكن التراجع عن هذا الإجراء.</span>
+                            </>
+                        )}
+                    </p>
+                    <div className="flex gap-3 w-full">
+                        <button onClick={onClose} className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+                            إلغاء
+                        </button>
+                        <button onClick={onConfirm} disabled={saveLoading} className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold shadow-lg shadow-red-900/20 flex items-center justify-center gap-2 transition">
+                            {saveLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'نعم، حذف'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};

@@ -1,5 +1,15 @@
 // ... existing code ...
 
+export interface TransactionCategory {
+  id: string;
+  label: string;
+}
+
+export interface TransactionCategories {
+  income: TransactionCategory[];
+  expense: TransactionCategory[];
+}
+
 export interface UserPermissions {
   dashboard: {
     view: boolean;

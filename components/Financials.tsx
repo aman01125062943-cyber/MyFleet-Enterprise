@@ -33,6 +33,7 @@ const Financials: React.FC = () => {
       .from('transactions')
       .select('*')
       .eq('org_id', org.id)
+      .is('deleted_at', null)
       .order('date', { ascending: false });
 
     if (data) setTransactions(data);

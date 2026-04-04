@@ -5,11 +5,11 @@ export interface LocalCar {
     id?: string;
     org_id: string;
     plate_number: string;
-    brand: string;
+    make: string;
     model: string;
-    year: number;
+    year: string;
     status: string;
-    current_mileage?: number;
+    current_odometer?: number;
     last_updated: number; // For conflict resolution
 }
 

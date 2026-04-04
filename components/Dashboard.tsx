@@ -124,7 +124,7 @@ const Dashboard: React.FC = () => {
             if (navigator.onLine && user.org_id) {
                 const { count: cCount } = await supabase.from('cars').select('*', { count: 'exact', head: true }).eq('org_id', user.org_id);
                 const { count: uCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('org_id', user.org_id);
-                const { data: remoteTxs } = await supabase.from('transactions').select('*').eq('org_id', user.org_id).gte('date', fetchStartDate).order('date', { ascending: true });
+                const { data: remoteTxs } = await supabase.from('transactions').select('*').eq('org_id', user.org_id).gte('date', fetchStartDate).is('deleted_at', null).order('date', { ascending: true });
 
                 carsCount = cCount || 0;
                 usersCount = uCount || 0;
