@@ -3,6 +3,8 @@
 export interface TransactionCategory {
   id: string;
   label: string;
+  is_custom?: boolean;
+  icon?: string;
 }
 
 export interface TransactionCategories {

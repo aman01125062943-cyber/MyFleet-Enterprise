@@ -168,16 +168,22 @@ class MessageService {
         if (!phoneNumber) return '';
 
         const original = String(phoneNumber);
+        
+        // Normalize Arabic/Persian digits to Western digits
+        const arabicDigitMap = { '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
+                                '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9' };
+        const normalized = original.replace(/[٠-٩۰-۹]/g, d => arabicDigitMap[d]);
+        
         console.log(`[MessageService] 🔍 Formatting phone: ${original}`);
 
         // If it's already a full JID, return as is
-        if (original.includes('@')) {
-            console.log(`[MessageService] ✅ Already a JID: ${original}`);
-            return original;
+        if (normalized.includes('@')) {
+            console.log(`[MessageService] ✅ Already a JID: ${normalized}`);
+            return normalized;
         }
 
         // Remove all non-digit characters
-        let cleaned = original.replace(/\D/g, '');
+        let cleaned = normalized.replace(/\D/g, '');
         console.log(`[MessageService] 📝 After removing non-digits: ${cleaned}`);
 
         // Handle Egyptian numbers starting with 0020 (international format with 00)

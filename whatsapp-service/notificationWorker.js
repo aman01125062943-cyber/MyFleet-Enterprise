@@ -301,26 +301,95 @@ class NotificationWorker {
 👤 ${vars.userName || ''}
 🏢 ${vars.orgName || ''}
 
-⏰ *باقي ${vars.daysRemaining || 0} أيام على انتهاء اشتراكك*
+⏰ *باقي يوم واحد فقط على انتهاء اشتراكك*
 
 ━━━━━━━━━━━━━━━━━━━
 📅 تاريخ الانتهاء: ${vars.expiryDate || ''}
 📦 الباقة: ${vars.planNameAr || ''}
 
-*⚠️ إذا لم يتم التجديد:*
+*⚠️ إذا لم يتم التجديد غداً:*
 ━━━━━━━━━━━━━━━━━━━
-❌ ستفقد الوصول للنظام
-❌ لن تتمكن من إدارة أسطولك
-❌ ستتوقف جميع الإشعارات
+❌ ستتوقف لوحة التحكم
+❌ لن تتمكن من إدارة السيارات
+❌ سيتوقف نظام التنبيهات
 
-*✨ قم بتجديد الاشتراك الآن:*
+🔔 *لتجنب توقف عملك، يرجى تجديد الاشتراك اليوم!*
+                `.trim();
+
+            case 'subscription_expired':
+                return `
+❌ *تنبيه: انتهى اشتراكك اليوم*
+
 ━━━━━━━━━━━━━━━━━━━
-1️⃣ افتح لوحة التحكم
-2️⃣ اختر "الاشتراكات"
-3️⃣ اختر الباقة المناسبة
-4️⃣ أكمل الدفع
+👤 ${vars.userName || ''}
+🏢 ${vars.orgName || ''}
 
-🔔 *لا تتأخر في التجديد للحفاظ على استمرارية عملك!*
+*لقد انتهت فترة اشتراكك في الباقة (${vars.planNameAr || ''}) اليوم.*
+تم إيقاف بعض الخدمات حتى يتم التجديد.
+
+*🔄 لاستعادة الخدمة كاملة:*
+━━━━━━━━━━━━━━━━━━━
+يرجى التواصل مع الإدارة أو تجديد الاشتراك من خلال لوحة التحكم الخاصة بك.
+
+💬 نحن هنا لمساعدتك في حال واجهت أي مشكلة!
+                `.trim();
+
+            case 'subscription_activated':
+                return `
+✅ *إشعار إداري: تم تفعيل اشتراكك*
+
+تم تفعيل المنشأة الخاصة بك من قبل الإدارة المركزية بنجاح.
+
+━━━━━━━━━━━━━━━━━━━
+🏢 المنشأة: ${vars.orgName || ''}
+📦 الباقة: ${vars.planNameAr || ''}
+📆 تاريخ الانتهاء: ${vars.expiryDate || ''}
+━━━━━━━━━━━━━━━━━━━
+
+🚀 أصبح بإمكانك الآن الدخول للنظام والاستفادة من جميع الميزات المتاحة في باقتك.
+                `.trim();
+
+            case 'subscription_deactivated':
+                return `
+⚠️ *إشعار إداري: تم إيقاف الاشتراك*
+
+نود إعلامك بأنه تم إيقاف الاشتراك الخاص بمنشأتك (${vars.orgName || ''}) مؤقتاً.
+
+━━━━━━━━━━━━━━━━━━━
+لمزيد من التفاصيل أو لطلب تفعيل الحساب مرة أخرى، يرجى التواصل مع الإدارة المركزية.
+━━━━━━━━━━━━━━━━━━━
+                `.trim();
+
+            case 'plan_changed':
+                return `
+🔄 *إشعار إداري: تم تغيير باقة الاشتراك*
+
+تم تغيير باقة الاشتراك الخاصة بمنشأتك بنجاح لتناسب تطور أعمالك.
+
+━━━━━━━━━━━━━━━━━━━
+🏢 المنشأة: ${vars.orgName || ''}
+📦 الباقة الجديدة: ${vars.planNameAr || ''}
+📆 تاريخ الانتهاء: ${vars.expiryDate || ''}
+━━━━━━━━━━━━━━━━━━━
+
+تأكد من الاطلاع على الصلاحيات الجديدة الخاصة بباقتك الحالية في لوحة التحكم.
+                `.trim();
+
+            case 'user_invited':
+                return `
+👋 *مرحباً بك في فريق العمل!*
+
+تمت إضافتك بنجاح كمستخدم جديد في المنشأة:
+🏢 ${vars.orgName || ''}
+
+━━━━━━━━━━━━━━━━━━━
+👤 اسم المستخدم: ${vars.employeeName || ''}
+📧 الدخول: ${vars.employeeEmail || ''}
+🔑 كلمة المرور المؤقتة: ${vars.employeePassword || ''}
+🛠️ الصلاحية (الدور): ${vars.employeeRole || ''}
+━━━━━━━━━━━━━━━━━━━
+
+⚠️ *هام جداً:* يرجى الدخول للنظام وتغيير كلمة المرور الخاصة بك فوراً لضمان أمان حسابك.
                 `.trim();
 
             default:
@@ -343,7 +412,8 @@ class NotificationWorker {
                 .single();
 
             const settings = config?.notification_settings || {};
-            const reminderDays = settings.reminder_days || [7, 3, 1];
+            // Include '0' for expiry today
+            const reminderDays = settings.reminder_days || [7, 3, 1, 0];
             const enabled = settings.expiry_reminders_enabled !== false;
 
             if (!enabled) {
@@ -362,7 +432,7 @@ class NotificationWorker {
                 `)
                 .eq('is_active', true)
                 .not('subscription_end', 'is', null)
-                .gt('subscription_end', new Date().toISOString().split('T')[0]);
+                .gte('subscription_end', new Date().toISOString().split('T')[0]);
 
             if (error) {
                 console.error('[NotificationWorker] ❌ Error fetching organizations:', error);
@@ -401,8 +471,9 @@ class NotificationWorker {
                     continue;
                 }
 
-                // Check if we already sent this type of reminder recently
-                const notificationType = daysRemaining === 1 ? 'expiry_urgent' : 'expiry_reminder';
+                let notificationType = 'expiry_reminder';
+                if (daysRemaining === 1) notificationType = 'expiry_urgent';
+                if (daysRemaining === 0) notificationType = 'subscription_expired';
 
                 const { data: existingLog } = await supabase
                     .from('whatsapp_notification_logs')

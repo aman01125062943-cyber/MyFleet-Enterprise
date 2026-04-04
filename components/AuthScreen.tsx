@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ShieldCheck, Loader2, Building2, User, Key, AlertCircle, ArrowRight, Lock, Mail, Eye, EyeOff, ArrowRight as ArrowRightIcon } from 'lucide-react';
+import { ShieldCheck, Loader2, Building2, User, Key, AlertCircle, Lock, Mail, Eye, EyeOff, ArrowRight as ArrowRightIcon } from 'lucide-react';
 import { db } from '../lib/db';
 import { SystemConfig } from '../types';
 
@@ -254,50 +254,34 @@ const AuthScreen: React.FC = () => {
 
                 if (rpcError) throw rpcError;
 
-                // 3. إرسال رسالة ترحيب عبر واتساب (في الخلفية - لا يوقف التسجيل)
+                // 3. جدولة رسالة ترحيب عبر واتساب (إدراج في Queue - لا يوقف التسجيل)
                 try {
-                    const whatsappServerUrl = `http://${window.location.hostname}:3002`;
+                    const startDate = new Date().toLocaleDateString('ar-EG');
+                    const endDate = new Date();
+                    endDate.setDate(endDate.getDate() + 14);
+                    const endDateStr = endDate.toLocaleDateString('ar-EG');
 
-                    // جلب أول جلسة متصلة
-                    const sessionsRes = await fetch(`${whatsappServerUrl}/api/sessions`);
-                    const sessionsData = await sessionsRes.json();
+                    // Normalize Arabic digits in phone number
+                    const arabicMap: Record<string, string> = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'};
+                    const normalizedPhone = whatsappNumber.replace(/[٠-٩]/g, d => arabicMap[d]);
 
-                    if (sessionsData.success && sessionsData.sessions?.length > 0) {
-                        const connectedSession = sessionsData.sessions.find(
-                            (s: { status: string }) => s.status === 'connected'
-                        );
-
-                        if (connectedSession) {
-                            // حساب تاريخ انتهاء الـ 14 يوم
-                            const endDate = new Date();
-                            endDate.setDate(endDate.getDate() + 14);
-                            const endDateStr = endDate.toLocaleDateString('ar-EG');
-
-                            const welcomeMessage = `مرحباً ${ownerName}! 👋
-
-تم تسجيل حسابك بنجاح في MyFleet Enterprise.
-
-📦 باقتك: النسخة التجريبية (14 يوم)
-📆 تاريخ الانتهاء: ${endDateStr}
-
-لمساعدة تواصل معنا على هذا الرقم.`;
-
-                            // إرسال الرسالة
-                            await fetch(`${whatsappServerUrl}/api/messages/send`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    sessionId: connectedSession.id,
-                                    phoneNumber: whatsappNumber.replace(/\D/g, ''), // أرقام فقط
-                                    message: welcomeMessage
-                                })
-                            });
-                            console.log('✅ Welcome WhatsApp message sent successfully');
-                        }
-                    }
-                } catch (whatsappError) {
-                    // لا نوقف التسجيل إذا فشل إرسال الرسالة
-                    console.warn('⚠️ Could not send WhatsApp welcome message:', whatsappError);
+                    await supabase.from('whatsapp_notification_queue').insert({
+                        org_id: null, // Will be set after signup completes
+                        user_id: authData.user.id,
+                        phone_number: normalizedPhone.replace(/\D/g, ''),
+                        notification_type: 'trial_welcome',
+                        variables: {
+                            userName: ownerName,
+                            orgName: orgName,
+                            planNameAr: 'تجريبي',
+                            startDate: startDate,
+                            endDate: endDateStr
+                        },
+                        status: 'pending'
+                    });
+                    console.log('✅ Trial welcome notification queued successfully');
+                } catch (queueError) {
+                    console.warn('⚠️ Could not queue welcome notification:', queueError);
                 }
 
                 // 4. Navigate (Assuming Auto-Login if email confirm is disabled)
@@ -515,7 +499,11 @@ const AuthScreen: React.FC = () => {
                                         id="reg-whatsapp"
                                         required
                                         value={whatsappNumber}
-                                        onChange={e => setWhatsappNumber(e.target.value)}
+                                        onChange={e => {
+                                            const arabicMap: Record<string, string> = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9','۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
+                                            const normalized = e.target.value.replace(/[٠-٩۰-۹]/g, d => arabicMap[d]);
+                                            setWhatsappNumber(normalized);
+                                        }}
                                         className="w-full bg-[#0f172a] border border-blue-500/50 rounded-xl p-3 pr-10 text-white outline-none focus:border-blue-400 placeholder:text-slate-600"
                                         placeholder="مثال: 01000000000"
                                     />

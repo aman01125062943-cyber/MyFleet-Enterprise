@@ -146,6 +146,7 @@ const Team: React.FC = () => {
     const [formData, setFormData] = useState({
         full_name: '',
         email: '',
+        whatsapp_number: '',
         password: '',
         role: 'staff',
         subscription_plan: org?.subscription_plan || 'starter',
@@ -205,6 +206,7 @@ const Team: React.FC = () => {
         setFormData({
             full_name: '',
             email: '',
+            whatsapp_number: '',
             password: '',
             role: 'staff',
             subscription_plan: defaultPlan,
@@ -223,6 +225,7 @@ const Team: React.FC = () => {
         setFormData({
             full_name: targetUser.full_name,
             email: targetUser.username, // Fallback mapping for edit
+            whatsapp_number: targetUser.whatsapp_number || '',
             password: '',
             role: targetUser.role || 'staff',
             subscription_plan: userPlan,
@@ -297,6 +300,7 @@ const Team: React.FC = () => {
         const { error: updateError } = await supabase.from('profiles').update({
             full_name: formData.full_name,
             username: formData.email,
+            whatsapp_number: formData.whatsapp_number || null,
             ...(formData.password ? { password: formData.password } : {})
         }).eq('id', selectedUser.id);
 
@@ -362,6 +366,29 @@ const Team: React.FC = () => {
 
             if (rpcError) throw rpcError;
 
+            // Update with whatsapp_number if provided
+            if (formData.whatsapp_number) {
+                await supabase.from('profiles').update({
+                    whatsapp_number: formData.whatsapp_number
+                }).eq('id', userId);
+
+                // Queue WhatsApp invitation notification
+                await supabase.from('whatsapp_notification_queue').insert({
+                    org_id: user?.org_id,
+                    user_id: userId,
+                    phone_number: formData.whatsapp_number,
+                    notification_type: 'user_invited',
+                    status: 'pending',
+                    variables: {
+                        orgName: org?.name || '',
+                        employeeName: formData.full_name,
+                        employeeEmail: formData.email,
+                        employeePassword: formData.password,
+                        employeeRole: templates[formData.role]?.label?.split(' ')[0] || formData.role
+                    }
+                });
+            }
+
             showToast('تم إنشاء الموظف بنجاح', 'success');
             setIsModalOpen(false);
 
@@ -372,6 +399,7 @@ const Team: React.FC = () => {
                 email: formData.email,
                 org_id: user?.org_id,
                 role: formData.role,
+                whatsapp_number: formData.whatsapp_number,
                 permissions: formData.permissions,
                 status: 'active',
                 // @ts-expect-error: created_at might be missing from base Profile type but returned from DB
@@ -568,6 +596,13 @@ const Team: React.FC = () => {
                                     <input className="w-full bg-slate-50 dark:bg-[#1e293b] border border-gray-200 dark:border-slate-700 rounded-xl p-3 text-slate-800 dark:text-white focus:border-blue-500 outline-none font-mono"
                                         type="email"
                                         value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} disabled={editMode} />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 mb-2 block">رقم الواتساب (اختياري)</label>
+                                    <input className="w-full bg-slate-50 dark:bg-[#1e293b] border border-gray-200 dark:border-slate-700 rounded-xl p-3 text-slate-800 dark:text-white focus:border-blue-500 outline-none font-mono text-left"
+                                        placeholder="مثال: 01xxxxxxxxx"
+                                        dir="ltr"
+                                        value={formData.whatsapp_number} onChange={e => setFormData({ ...formData, whatsapp_number: e.target.value })} />
                                 </div>
                                 {!editMode && (
                                     <div>

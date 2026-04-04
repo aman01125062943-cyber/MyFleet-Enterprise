@@ -464,7 +464,8 @@ const OrganizationsSection: React.FC<{ initialOrgs: Organization[]; onRefresh: (
     const [filteredOrgs, setFilteredOrgs] = useState<Organization[]>(initialOrgs);
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 20;
-    const [selectedOrgIds, setSelectedOrgIds] = useState<Set<string>>(new Set());
+    // Bulk selection state - reserved for future bulk actions UI
+    // const [selectedOrgIds, setSelectedOrgIds] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         setOrgs(initialOrgs);
@@ -525,66 +526,7 @@ const OrganizationsSection: React.FC<{ initialOrgs: Organization[]; onRefresh: (
         }
     };
 
-    // ==================== BULK ACTIONS ====================
-    const handleSelectAll = () => {
-        if (selectedOrgIds.size === paginatedOrgs.length) {
-            setSelectedOrgIds(new Set());
-        } else {
-            setSelectedOrgIds(new Set(paginatedOrgs.map(o => o.id)));
-        }
-    };
 
-    const handleSelectOrg = (orgId: string) => {
-        const newSelected = new Set(selectedOrgIds);
-        if (newSelected.has(orgId)) {
-            newSelected.delete(orgId);
-        } else {
-            newSelected.add(orgId);
-        }
-        setSelectedOrgIds(newSelected);
-    };
-
-    const handleBulkDelete = async () => {
-        if (selectedOrgIds.size === 0) return;
-        if (!confirm(`هل أنت متأكد من حذف ${selectedOrgIds.size} منظمة؟`)) return;
-
-        const { error } = await supabase.from('organizations').delete().in('id', Array.from(selectedOrgIds));
-        if (error) {
-            alert('خطأ: ' + error.message);
-        } else {
-            setOrgs(orgs.filter(o => !selectedOrgIds.has(o.id)));
-            setSelectedOrgIds(new Set());
-            onRefresh();
-            alert(`تم حذف ${selectedOrgIds.size} منظمة بنجاح`);
-        }
-    };
-
-    const handleBulkActivate = async () => {
-        if (selectedOrgIds.size === 0) return;
-        const { error } = await supabase.from('organizations').update({ is_active: true }).in('id', Array.from(selectedOrgIds));
-        if (error) {
-            alert('خطأ: ' + error.message);
-        } else {
-            setOrgs(orgs.map(o => selectedOrgIds.has(o.id) ? { ...o, is_active: true } : o));
-            setSelectedOrgIds(new Set());
-            onRefresh();
-            alert(`تم تفعيل ${selectedOrgIds.size} منظمة بنجاح`);
-        }
-    };
-
-    const handleBulkDeactivate = async () => {
-        if (selectedOrgIds.size === 0) return;
-        if (!confirm(`هل أنت متأكد من تعطيل ${selectedOrgIds.size} منظمة؟`)) return;
-        const { error } = await supabase.from('organizations').update({ is_active: false }).in('id', Array.from(selectedOrgIds));
-        if (error) {
-            alert('خطأ: ' + error.message);
-        } else {
-            setOrgs(orgs.map(o => selectedOrgIds.has(o.id) ? { ...o, is_active: false } : o));
-            setSelectedOrgIds(new Set());
-            onRefresh();
-            alert(`تم تعطيل ${selectedOrgIds.size} منظمة بنجاح`);
-        }
-    };
 
     const getPlanBadge = (plan: string) => {
         const plans: Record<string, { bg: string, text: string, label: string }> = {
@@ -876,14 +818,7 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
 
     // Plans State
     const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
-
-    // WhatsApp Session State
-    const [systemSessionId, setSystemSessionId] = useState<string | null>(null);
-
     useEffect(() => {
-        // Always fetch system session for notifications
-        fetchSystemSession();
-
         if (activeTab === 'users' || activeTab === 'security') fetchOrgUsers();
         // Always fetch owner info for the Info tab
         fetchOwnerInfo();
@@ -893,38 +828,17 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
         }
     }, [activeTab]);
 
-    const fetchSystemSession = async () => {
-        // First try to fetch the system default session
-        let { data } = await supabase.from('whatsapp_sessions')
-            .select('id')
-            .eq('is_system_default', true)
-            .eq('status', 'connected')
-            .limit(1)
-            .maybeSingle();
-
-        // Fallback: if no system default, use the first connected session
-        if (!data) {
-            const { data: fallbackData } = await supabase.from('whatsapp_sessions')
-                .select('id')
-                .eq('status', 'connected')
-                .order('created_at', { ascending: true })
-                .limit(1)
-                .maybeSingle();
-            data = fallbackData;
-        }
-
-        if (data) {
-            setSystemSessionId(data.id);
-            console.log('[WhatsApp] Using system session:', data.id);
-        } else {
-            console.warn('[WhatsApp] No connected session found for notifications');
-        }
-    };
+    // fetchSystemSession and systemSessionId are no longer needed locally
+    // as notifications are now queued and sent by the backend worker.
 
     // Helper to format phone numbers (Egyptian & International)
     const formatPhoneNumber = (phone: string) => {
         if (!phone) return '';
-        let cleaned = phone.replace(/\D/g, ''); // Remove all non-digits
+        // Normalize Arabic/Persian digits
+        const arabicMap: Record<string, string> = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
+                                                   '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
+        const normalized = phone.replaceAll(/[٠-٩۰-۹]/g, d => arabicMap[d]);
+        let cleaned = normalized.replaceAll(/\D/g, ''); // Remove all non-digits
 
         // Egyptian number format: 01xxxxxxxxx -> 201xxxxxxxxx
         if (cleaned.length === 11 && cleaned.startsWith('01')) {
@@ -957,78 +871,49 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
         setLoadingUsers(false);
     };
 
-    const sendSubscriptionNotification = async (
-        oldPlan: string,
-        newPlan: string,
-        oldStatus: boolean,
-        newStatus: boolean,
-        ownerName: string,
-        ownerPhone: string,
-        orgName: string,
-        subEnd: string
-    ) => {
-        // Validation: Only proceed if there's a real change and we have a phone number
-        if ((oldPlan === newPlan && oldStatus === newStatus) || !ownerPhone) return;
+    const sendSubscriptionNotification = async (opts: {
+        oldPlan: string; newPlan: string; oldStatus: boolean; newStatus: boolean;
+        ownerName: string; ownerPhone: string; orgName: string; subEnd: string;
+    }) => {
+        if ((opts.oldPlan === opts.newPlan && opts.oldStatus === opts.newStatus) || !opts.ownerPhone || !ownerProfile) return;
 
         try {
-            // Determine duration based on start and end dates (approximate)
-            const startDate = new Date(formData.subscription_start || Date.now());
-            const endDate = new Date(subEnd || Date.now());
-            const durationMonths = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
-
-            const periodText = durationMonths >= 11 ? 'سنوي' : 'شهري';
-            const planName = availablePlans.find(p => p.id === newPlan)?.name_ar || newPlan;
-            const finalOwnerName = ownerName || 'العميل';
-
-            let message = '';
-
+            const planNameAr = availablePlans.find(p => p.id === opts.newPlan)?.name_ar || opts.newPlan;
+            
+            let notificationType = '';
+            
             // Case 1: Activation
-            if (!oldStatus && newStatus) {
-                message = `🎉 *تم تفعيل اشتراكك بنجاح!*\n\nعزيزي *${finalOwnerName}*،\nيسعدنا إبلاغك بأنه تم تفعيل اشتراك منظمتك *${orgName}*.\n\n📦 *الباقة:* ${planName}\n🗓 *الفترة:* ${periodText}\n📅 *تاريخ الانتهاء:* ${subEnd}\n\nجاهزون لخدمتكم دائماً! 🚀`;
-            }
+            if (!opts.oldStatus && opts.newStatus) notificationType = 'subscription_activated';
             // Case 2: Deactivation
-            else if (oldStatus && !newStatus) {
-                message = `⛔ *تنبيه: تم إيقاف الاشتراك*\n\nعزيزي *${finalOwnerName}*،\nتم إيقاف اشتراك منظمتك *${orgName}* مؤقتاً.\nيرجى التواصل مع الإدارة لاستعادة الخدمة.\n\nشكراً لتفهمكم.`;
-            }
-            // Case 3: Plan Change (Upgrade/Downgrade)
-            else if (oldPlan !== newPlan) {
-                message = `📦 *تحديث حالة الباقة*\n\nعزيزي *${finalOwnerName}*،\nتم تحديث باقة منظمتك *${orgName}* بنجاح.\n\n✅ *الباقة الجديدة:* ${planName}\n🗓 *الفترة:* ${periodText}\n📅 *تاريخ الانتهاء:* ${subEnd}\n\nنتمنى لك تجربة ممتعة! 🌟`;
-            }
+            else if (opts.oldStatus && !opts.newStatus) notificationType = 'subscription_deactivated';
+            // Case 3: Plan Change
+            else if (opts.oldPlan !== opts.newPlan) notificationType = 'plan_changed';
 
-            if (message) {
-                const { data: { session } } = await supabase.auth.getSession();
-
-                if (systemSessionId && session?.access_token) {
-                    const whatsappServiceUrl = import.meta.env.VITE_WHATSAPP_SERVICE_URL || 'http://localhost:3002';
-                    const response = await fetch(`${whatsappServiceUrl}/api/messages/send`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${session.access_token}`
-                        },
-                        body: JSON.stringify({
-                            sessionId: systemSessionId,
-                            phoneNumber: formatPhoneNumber(ownerPhone),
-                            message: message
-                        })
-                    });
-
-                    if (!response.ok) {
-                        const errData = await response.json();
-                        console.error('Failed to send WhatsApp:', errData);
-                        alert('فشل إرسال إشعار واتساب: ' + (errData.error || response.statusText));
-                    } else {
-                        console.log('WhatsApp notification sent successfully');
-                        alert('تم تحديث البيانات وإرسال إشعار واتساب بنجاح! 🎉');
-                    }
-                } else {
-                    console.warn('No system session or auth token available');
-                    alert('تم الحفظ، ولكن لم يتم إرسال الإشعار لعدم اتصال واتساب.');
+            if (!notificationType) return;
+            
+            const { error } = await supabase.from('whatsapp_notification_queue').insert({
+                org_id: org.id,
+                user_id: ownerProfile.id,
+                phone_number: formatPhoneNumber(opts.ownerPhone),
+                notification_type: notificationType,
+                status: 'pending',
+                variables: {
+                    userName: opts.ownerName || 'العميل',
+                    orgName: opts.orgName,
+                    planName: opts.newPlan,
+                    planNameAr: planNameAr,
+                    expiryDate: opts.subEnd?.split('T')[0] || ''
                 }
-            }
+            });
+
+            if (error) throw error;
+
+            console.log(`[SuperAdmin] Queued ${notificationType} notification`);
+            alert('تم تثبيت التغييرات وإضافة الإشعار لطابور الإرسال بنجاح! 🎉');
+
         } catch (err) {
-            console.error('Failed to send WhatsApp notification:', err);
-            alert('حدث خطأ غير متوقع أثناء إرسال الإشعار.');
+            console.error('Failed to queue notification:', err);
+            alert('حدث خطأ أثناء إضافة الإشعار للطابور: ' + (err instanceof Error ? err.message : String(err)));
         }
     };
 
@@ -1085,16 +970,16 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
         }
 
         // 3. Send WhatsApp Notification
-        await sendSubscriptionNotification(
-            org.subscription_plan,
-            formData.subscription_plan,
-            org.is_active,
-            formData.is_active,
-            ownerProfile?.full_name || 'العميل',
-            formData.owner_phone!,
-            formData.name,
-            formData.subscription_end || ''
-        );
+        await sendSubscriptionNotification({
+            oldPlan: org.subscription_plan,
+            newPlan: formData.subscription_plan,
+            oldStatus: org.is_active,
+            newStatus: formData.is_active,
+            ownerName: ownerProfile?.full_name || 'العميل',
+            ownerPhone: formData.owner_phone!,
+            orgName: formData.name,
+            subEnd: formData.subscription_end || ''
+        });
 
         setSaving(false);
         onUpdate();
@@ -1918,7 +1803,7 @@ const AnnouncementsSection: React.FC = () => {
                                                 const updated = (current as string[]).includes(mod)
                                                     ? (current as string[]).filter((m) => m !== mod)
                                                     : [...current, mod];
-                                                if (config) setConfig({ ...config, grace_period_allowed_modules: updated as (keyof UserPermissions)[] });
+                                                if (config) setConfig({ ...config, grace_period_allowed_modules: updated });
                                             }}
                                             className={`px-3 py-1 rounded-full text-[10px] font-bold transition ${((config as SystemConfig)?.grace_period_allowed_modules || ['inventory'] as (keyof UserPermissions)[] as string[])?.includes(mod) ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500'}`}
                                         >
@@ -3092,7 +2977,7 @@ const PaymentRequestsSection: React.FC<{ currentUser: Profile | null }> = ({ cur
     const [rejectReason, setRejectReason] = useState('');
 
     // فحص الصلاحيات
-    const canView = currentUser?.permissions.subscription?.view_requests || false;
+    // const canView = currentUser?.permissions.subscription?.view_requests || false;
     const canApprove = currentUser?.permissions.subscription?.approve_requests || false;
     const canReject = currentUser?.permissions.subscription?.reject_requests || false;
 
