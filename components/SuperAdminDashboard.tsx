@@ -1039,6 +1039,17 @@ const OrganizationDetailModal: React.FC<{ org: Organization; initialTab?: OrgTab
             }
             throw authError;
         }
+
+        // BUG FIX: Case where no error is returned but user object exists with empty identities
+        if (authData.user?.identities?.length === 0) {
+            const { data: loginData, error: loginError } = await client.auth.signInWithPassword({
+                email: newUserForm.email,
+                password: newUserForm.password,
+            });
+            if (loginError) throw new Error('هذا البريد الإلكتروني مسجل مسبقاً بكلمة مرور مختلفة.');
+            return loginData.session?.user.id;
+        }
+
         return authData.user?.id;
     };
 

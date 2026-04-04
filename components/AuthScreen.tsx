@@ -56,7 +56,7 @@ const AuthScreen: React.FC = () => {
         const sessions = await db.sessions.toArray();
         // Lowercase comparison to be safe
         const matchedSession = sessions.find(s =>
-            (s.profile.email && s.profile.email.toLowerCase() === username.toLowerCase()) ||
+            (s.profile.email?.toLowerCase() === username.toLowerCase()) ||
             (s.id === username)
         );
 
@@ -170,7 +170,7 @@ const AuthScreen: React.FC = () => {
             if (err instanceof Error) {
                 msg = err.message;
             } else if (typeof err === 'object' && err !== null && 'message' in err) {
-                msg = String((err as any).message);
+                msg = String((err as { message: string }).message);
             }
 
             // Login Errors (Localized)
@@ -254,35 +254,7 @@ const AuthScreen: React.FC = () => {
 
                 if (rpcError) throw rpcError;
 
-                // 3. جدولة رسالة ترحيب عبر واتساب (إدراج في Queue - لا يوقف التسجيل)
-                try {
-                    const startDate = new Date().toLocaleDateString('ar-EG');
-                    const endDate = new Date();
-                    endDate.setDate(endDate.getDate() + 14);
-                    const endDateStr = endDate.toLocaleDateString('ar-EG');
-
-                    // Normalize Arabic digits in phone number
-                    const arabicMap: Record<string, string> = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'};
-                    const normalizedPhone = whatsappNumber.replace(/[٠-٩]/g, d => arabicMap[d]);
-
-                    await supabase.from('whatsapp_notification_queue').insert({
-                        org_id: null, // Will be set after signup completes
-                        user_id: authData.user.id,
-                        phone_number: normalizedPhone.replace(/\D/g, ''),
-                        notification_type: 'trial_welcome',
-                        variables: {
-                            userName: ownerName,
-                            orgName: orgName,
-                            planNameAr: 'تجريبي',
-                            startDate: startDate,
-                            endDate: endDateStr
-                        },
-                        status: 'pending'
-                    });
-                    console.log('✅ Trial welcome notification queued successfully');
-                } catch (queueError) {
-                    console.warn('⚠️ Could not queue welcome notification:', queueError);
-                }
+                // 3. WhatsApp notification is automatically queued by complete_signup RPC
 
                 // 4. Navigate (Assuming Auto-Login if email confirm is disabled)
                 if (authData.session) {
@@ -294,11 +266,11 @@ const AuthScreen: React.FC = () => {
                 }
             }
 
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Registration Error:', err);
             let msg = 'حدث خطأ غير متوقع أثناء إنشاء الحساب.';
 
-            const errorString = err.message || String(err);
+            const errorString = (err instanceof Error ? err.message : String(err));
 
             // تحويل الأخطاء التقنية لرسائل مفهومة بالعربية
             if (errorString.includes('profiles_whatsapp_number_key')) {

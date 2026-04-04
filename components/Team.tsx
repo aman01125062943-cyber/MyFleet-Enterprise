@@ -188,7 +188,7 @@ const Team: React.FC = () => {
     };
 
     // الحصول على الصلاحيات القصوى للباقة المحددة
-    const maxPermissionsForCurrentPlan = PLAN_MAX_PERMISSIONS[formData.subscription_plan as keyof typeof PLAN_MAX_PERMISSIONS] || PLAN_MAX_PERMISSIONS.starter;
+    const maxPermissionsForCurrentPlan = PLAN_MAX_PERMISSIONS[formData.subscription_plan as keyof typeof PLAN_MAX_PERMISSIONS] ?? PLAN_MAX_PERMISSIONS.starter;
 
     const handleOpenCreate = () => {
         // SECURITY GUARD: Read Only
@@ -320,9 +320,7 @@ const Team: React.FC = () => {
         }
 
         try {
-            // @ts-expect-error: import.meta might not be available
             const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-            // @ts-expect-error: import.meta might not be available
             const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
             // SECURITY: Validate credentials exist - no hardcoded fallbacks
@@ -350,7 +348,18 @@ const Team: React.FC = () => {
                     throw authError;
                 }
             } else if (authData.user) {
-                userId = authData.user.id;
+                // BUG FIX: 422 error workaround - if user exists but not confirmed, 
+                // sometimes signUp returns a user object with empty identities instead of an error.
+                if (authData.user.identities?.length === 0) {
+                   const { data: loginData, error: loginError } = await tempClient.auth.signInWithPassword({
+                      email: formData.email,
+                      password: formData.password,
+                  });
+                  if (loginError) throw new Error('هذا البريد الإلكتروني مسجل مسبقاً بكلمة مرور مختلفة.');
+                  if (loginData.session) userId = loginData.session.user.id;
+                } else {
+                   userId = authData.user.id;
+                }
             }
 
             if (!userId) throw new Error("فشل في إنشاء الحساب");
@@ -372,14 +381,13 @@ const Team: React.FC = () => {
                     whatsapp_number: formData.whatsapp_number
                 }).eq('id', userId);
 
-                // Queue WhatsApp invitation notification
-                await supabase.from('whatsapp_notification_queue').insert({
-                    org_id: user?.org_id,
-                    user_id: userId,
-                    phone_number: formData.whatsapp_number,
-                    notification_type: 'user_invited',
-                    status: 'pending',
-                    variables: {
+                // Queue WhatsApp invitation notification via RPC (More robust than direct insert)
+                await supabase.rpc('queue_user_notification', {
+                    p_org_id: user?.org_id,
+                    p_user_id: userId,
+                    p_phone: formData.whatsapp_number,
+                    p_type: 'user_invited',
+                    p_variables: {
                         orgName: org?.name || '',
                         employeeName: formData.full_name,
                         employeeEmail: formData.email,
@@ -435,7 +443,7 @@ const Team: React.FC = () => {
     const togglePerm = (category: keyof UserPermissions, key: string) => {
         if (isReadOnly) return;
 
-        const currentValue = (formData.permissions[category] as any)?.[key] || false;
+        const currentValue = (formData.permissions[category] as Record<string, boolean>)?.[key] || false;
         const newValue = !currentValue;
 
         // إذا كان المحاولة تفعيل صلاحية، تأكد أنها مسموحة في الباقة
@@ -662,7 +670,7 @@ const Team: React.FC = () => {
                                         <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2 flex items-center justify-between">
                                             <span>🚗 إدارة الأسطول</span>
                                             {!maxPermissionsForCurrentPlan.inventory?.view && (
-                                                <Lock className="w-4 h-4 text-amber-500" title="غير متاح في هذه الباقة" />
+                                                <Lock className="w-4 h-4 text-amber-500" aria-label="غير متاح في هذه الباقة" />
                                             )}
                                         </div>
                                         <div className="space-y-3">
@@ -733,7 +741,7 @@ const Team: React.FC = () => {
                                         <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2 flex items-center justify-between">
                                             <span>💰 المالية</span>
                                             {!maxPermissionsForCurrentPlan.finance?.view && (
-                                                <Lock className="w-4 h-4 text-amber-500" title="غير متاح في هذه الباقة" />
+                                                <Lock className="w-4 h-4 text-amber-500" aria-label="غير متاح في هذه الباقة" />
                                             )}
                                         </div>
                                         <div className="space-y-3">
@@ -789,7 +797,7 @@ const Team: React.FC = () => {
                                         <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2 flex items-center justify-between">
                                             <span>🏗️ الأصول</span>
                                             {!maxPermissionsForCurrentPlan.assets?.view && (
-                                                <Lock className="w-4 h-4 text-amber-500" title="غير متاح في هذه الباقة" />
+                                                <Lock className="w-4 h-4 text-amber-500" aria-label="غير متاح في هذه الباقة" />
                                             )}
                                         </div>
                                         <div className="space-y-3">
@@ -821,7 +829,7 @@ const Team: React.FC = () => {
                                         <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2 flex items-center justify-between">
                                             <span>👥 الإدارة</span>
                                             {!maxPermissionsForCurrentPlan.team?.view && (
-                                                <Lock className="w-4 h-4 text-amber-500" title="غير متاح في هذه الباقة" />
+                                                <Lock className="w-4 h-4 text-amber-500" aria-label="غير متاح في هذه الباقة" />
                                             )}
                                         </div>
                                         <div className="space-y-3">
@@ -846,7 +854,7 @@ const Team: React.FC = () => {
                                         <div className="font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-gray-200 dark:border-slate-700 pb-2 flex items-center justify-between">
                                             <span>📊 التقارير</span>
                                             {!maxPermissionsForCurrentPlan.reports?.view && (
-                                                <Lock className="w-4 h-4 text-amber-500" title="غير متاح في هذه الباقة" />
+                                                <Lock className="w-4 h-4 text-amber-500" aria-label="غير متاح في هذه الباقة" />
                                             )}
                                         </div>
                                         <div className="space-y-3">
