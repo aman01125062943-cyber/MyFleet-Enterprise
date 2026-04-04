@@ -51,14 +51,23 @@ const getDayDiff = (d1: Date, d2: Date) => {
     return Math.ceil((date2.getTime() - date1.getTime()) / (1000 * 60 * 60 * 24));
 };
 
+// Helper: Get Start of Current Week (Saturday)
+const getStartOfCurrentWeek = (date: Date) => {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const day = d.getDay();
+    const offset = (day + 1) % 7;
+    d.setDate(d.getDate() - offset);
+    return d;
+};
+
 // Helper: Process Transaction Data to reduce complexity in useEffect
-const processTransactionStats = (txData: any[]) => {
+const processTransactionStats = (txData: Transaction[]) => {
     let mInc = 0, mExp = 0, wInc = 0, wExp = 0;
 
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(today.getDate() - 7);
+    const startOfWeek = getStartOfCurrentWeek(today);
 
     for (const t of txData) {
         const amount = Number(t.amount);
@@ -67,7 +76,7 @@ const processTransactionStats = (txData: any[]) => {
             if (t.type === 'income') mInc += amount;
             else mExp += amount;
         }
-        if (tDateObj >= sevenDaysAgo) {
+        if (tDateObj >= startOfWeek) {
             if (t.type === 'income') wInc += amount;
             else wExp += amount;
         }
@@ -105,13 +114,12 @@ const Dashboard: React.FC = () => {
 
             let carsCount = 0;
             let usersCount = 0;
-            let txData: any[] = [];
+            let txData: Transaction[] = [];
 
             const today = new Date();
             const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-            const sevenDaysAgo = new Date();
-            sevenDaysAgo.setDate(today.getDate() - 7);
-            const fetchStartDate = startOfMonth < sevenDaysAgo ? startOfMonth.toISOString().split('T')[0] : sevenDaysAgo.toISOString().split('T')[0];
+            const startOfWeek = getStartOfCurrentWeek(today);
+            const fetchStartDate = startOfMonth < startOfWeek ? startOfMonth.toISOString().split('T')[0] : startOfWeek.toISOString().split('T')[0];
 
             if (navigator.onLine && user.org_id) {
                 const { count: cCount } = await supabase.from('cars').select('*', { count: 'exact', head: true }).eq('org_id', user.org_id);
@@ -137,7 +145,7 @@ const Dashboard: React.FC = () => {
             setStats({
                 totalCars: carsCount,
                 totalUsers: usersCount,
-                recentTx: recentTx as Transaction[],
+                recentTx: recentTx,
                 monthlyIncome: mInc,
                 monthlyExpense: mExp,
                 weeklyIncome: wInc,
@@ -246,7 +254,10 @@ const Dashboard: React.FC = () => {
             {/* 2. WEEKLY STATS */}
             <div>
                 <h3 className="font-bold text-sm md:text-lg text-slate-800 dark:text-white mb-3 flex items-center gap-2">
-                    <BarChart3 className="w-4 h-4 md:w-5 md:h-5 text-orange-500" /> أداء آخر 7 أيام
+                    <BarChart3 className="w-4 h-4 md:w-5 md:h-5 text-orange-500" /> أداء الأسبوع 
+                    <span className="text-[10px] md:text-xs text-slate-400 font-normal mr-2 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                        (من السبت إلى الجمعة)
+                    </span>
                 </h3>
                 <div className="flex items-stretch justify-between gap-2 md:gap-6">
                     <StatCard title="وارد أسبوعي" amount={stats.weeklyIncome} type="income" />
@@ -304,7 +315,7 @@ const Dashboard: React.FC = () => {
                                             {t.amount?.toLocaleString()} {systemConfig?.currency || 'ج.م'}
                                         </td>
                                         <td className="px-4 py-3 text-xs md:text-sm text-slate-500 dark:text-slate-400 truncate max-w-[150px]">
-                                            {t.reason || '-'}
+                                            {t.reason || t.notes || '-'}
                                         </td>
                                     </tr>
                                 ))

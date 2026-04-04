@@ -24,13 +24,13 @@ const GlobalTrash: React.FC = () => {
         if (!org?.id) return;
         try {
             setLoading(true);
-            // Fetch deleted transactions and join with cars to show which car it belongs to
-            // IMPORTANT: Filter by org_id to ensure data isolation (every account has its own data)
+            // Fetch deleted transactions and JOIN cautiously with cars
+            // Using transactions.org_id directly for better performance and RLS compatibility
             const { data, error } = await supabase
                 .from('transactions')
-                .select('*, car:cars!inner(*)')
+                .select('*, car:cars(*)')
+                .eq('org_id', org.id) // Direct filter on transactions table
                 .not('deleted_at', 'is', null)
-                .eq('car.org_id', org.id)
                 .order('deleted_at', { ascending: false });
 
             if (error) throw error;
@@ -78,11 +78,15 @@ const GlobalTrash: React.FC = () => {
         }
     };
 
-    const filteredTrash = trashTxs.filter(t => 
-        (t.notes?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (t.car?.make?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (t.car?.plate_number?.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+    const filteredTrash = trashTxs.filter(t => {
+        const s = searchTerm.toLowerCase();
+        return (
+            (t.notes || '').toLowerCase().includes(s) ||
+            (t.car?.make || '').toLowerCase().includes(s) ||
+            (t.car?.model || '').toLowerCase().includes(s) ||
+            (t.car?.plate_number || '').toLowerCase().includes(s)
+        );
+    });
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">

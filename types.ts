@@ -62,8 +62,8 @@ export interface Profile {
 }
 
 export interface Transaction {
-  id: string;
-  user_id: string;
+  id?: string;
+  user_id?: string;
   car_id: string;
   type: 'income' | 'expense';
   amount: number;
@@ -74,6 +74,7 @@ export interface Transaction {
   car_name?: string;
   category?: string;
   notes?: string;
+  car?: Car;
 }
 
 export interface CarStats {
@@ -320,6 +321,7 @@ export interface SystemConfig {
   available_plans: Plan[];
   survey_link?: string;
   support_contact?: string;
+  currency?: string;
 }
 
 export interface AuditLog {
