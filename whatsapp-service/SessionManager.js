@@ -1,9 +1,9 @@
-import makeWASocket, { DisconnectReason, fetchLatestBaileysVersion, useMultiFileAuthState } from '@whiskeysockets/baileys';
+import makeWASocket, { DisconnectReason, fetchLatestBaileysVersion, useMultiFileAuthState as initMultiFileAuthState } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import QRCode from 'qrcode';
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 class SessionManager {
     constructor(supabase) {
@@ -29,7 +29,7 @@ class SessionManager {
      */
     async createSession(sessionId, callbacks = {}) {
         try {
-            const { onQR, onConnected, onDisconnected, onMessage } = callbacks;
+            const { onMessage } = callbacks;
 
             // Clear from removedSessions when starting new connection
             if (!callbacks.retryCount) {
@@ -76,8 +76,8 @@ class SessionManager {
                 fs.mkdirSync(sessionPath, { recursive: true });
             }
 
-            // Load auth state using useMultiFileAuthState (like wasel project)
-            const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+            // Load auth state using initMultiFileAuthState (like wasel project)
+            const { state, saveCreds } = await initMultiFileAuthState(sessionPath);
 
             // Get latest Baileys version (with caching)
             if (!this.baileysVersion) {
@@ -124,151 +124,7 @@ class SessionManager {
             console.log(`[SessionManager] 🔄 Session ${sessionId} now in connecting state`);
 
             // Handle connection updates
-            sock.ev.on('connection.update', async (update) => {
-                const { connection, lastDisconnect, qr } = update;
-
-                console.log(`[SessionManager] 📡 Connection update for ${sessionId}: connection=${connection}, hasQR=${!!qr}`);
-
-                // QR Code generated
-                if (qr) {
-                    console.log(`[SessionManager] ✅ QR Code generated for ${sessionId}`);
-
-                    const qrDataURL = await QRCode.toDataURL(qr, {
-                        errorCorrectionLevel: 'H',
-                        type: 'image/png',
-                        quality: 0.95,
-                        margin: 2,
-                        width: 300
-                    });
-
-                    this.qrCodes.set(sessionId, qrDataURL);
-                    console.log(`[SessionManager] 📱 QR Code stored for ${sessionId}, ready for scanning`);
-
-                    if (onQR) {
-                        onQR(qrDataURL, qr);
-                    }
-                }
-
-                // Connection closed
-                if (connection === 'close') {
-                    const statusCode = (lastDisconnect?.error instanceof Boom)
-                        ? lastDisconnect.error.output.statusCode
-                        : null;
-                    const reason = lastDisconnect?.error?.message || 'Unknown reason';
-                    const isLoggedOut = statusCode === DisconnectReason.loggedOut;
-                    const shouldReconnect = !isLoggedOut;
-
-                    console.log(`[SessionManager] 🔴 Connection CLOSED for ${sessionId}`);
-                    console.log(`[SessionManager] Status Code: ${statusCode} (${this.getDisconnectReasonName(statusCode)})`);
-                    console.log(`[SessionManager] Reason: ${reason}`);
-                    console.log(`[SessionManager] Should Reconnect: ${shouldReconnect}`);
-
-                    if (this.reconnectTimers.has(sessionId)) {
-                        clearTimeout(this.reconnectTimers.get(sessionId));
-                        this.reconnectTimers.delete(sessionId);
-                    }
-
-                    if (this.removedSessions.has(sessionId)) {
-                        console.log(`[SessionManager] Session ${sessionId} was manually removed, skipping reconnect.`);
-                        if (onDisconnected) {
-                            onDisconnected(lastDisconnect);
-                        }
-                        return;
-                    }
-
-                    if (isLoggedOut) {
-                        console.log(`[SessionManager] 🚪 Session ${sessionId} logged out (unpaired)`);
-
-                        // Update DB
-                        await this.supabase
-                            .from('whatsapp_sessions')
-                            .update({
-                                status: 'disconnected',
-                                auth_state: null, // Clear auth state on logout
-                                connected_at: null,
-                                updated_at: new Date().toISOString()
-                            })
-                            .eq('id', sessionId);
-
-                        if (onDisconnected) {
-                            onDisconnected(lastDisconnect);
-                        }
-                        return;
-                    }
-
-                    if (shouldReconnect) {
-                        const retryCount = (callbacks.retryCount || 0) + 1;
-                        const maxRetries = callbacks.isNew ? 5 : 100;
-
-                        if (retryCount <= maxRetries) {
-                            const retryDelay = Math.min(5000 * Math.pow(2, retryCount - 1), 120000);
-
-                            console.log(`[SessionManager] 🔄 Reconnecting ${sessionId} (${retryCount}/${maxRetries}) in ${retryDelay}ms...`);
-
-                            const timer = setTimeout(() => {
-                                this.createSession(sessionId, {
-                                    ...callbacks,
-                                    retryCount
-                                });
-                            }, retryDelay);
-
-                            this.reconnectTimers.set(sessionId, timer);
-                        } else {
-                            console.log(`[SessionManager] ❌ Max reconnection attempts reached for ${sessionId}`);
-                        }
-                    }
-
-                    if (onDisconnected) {
-                        onDisconnected(lastDisconnect);
-                    }
-                }
-
-                // Connection opened
-                if (connection === 'open') {
-                    console.log(`[SessionManager] ✨ Connection OPEN for ${sessionId}`);
-                    console.log(`[SessionManager] ✅ Successfully paired with: ${sock.user?.id}`);
-                    this.qrCodes.delete(sessionId);
-
-                    // Update DB status to connected
-                    const phoneNumber = sock.user?.id?.split(':')[0];
-                    const whatsappId = sock.user?.id;
-                    await this.supabase
-                        .from('whatsapp_sessions')
-                        .update({
-                            status: 'connected',
-                            phone_number: phoneNumber,
-                            whatsapp_id: whatsappId,
-                            last_connected_at: new Date().toISOString(),
-                            updated_at: new Date().toISOString()
-                        })
-                        .eq('id', sessionId)
-                        .then(({ error }) => {
-                            if (error) {
-                                console.error('[SessionManager] ❌ Failed to update session status:', error.message);
-                            } else {
-                                console.log('[SessionManager] ✅ Session status updated to connected');
-                            }
-                        });
-
-                    // Send Welcome Message to Manager
-                    try {
-                        const welcomeMessage = `✅ تم ربط نظام مدير الأسطول (MyFleet Pro) برقم الواتساب هذا بنجاح!\n\nيمكنك الآن إرسال واستقبال التنبيهات والرسائل التلقائية من خلال النظام. 🚀`;
-                        await sock.sendMessage(`${phoneNumber}@s.whatsapp.net`, { text: welcomeMessage });
-                        console.log(`[SessionManager] Welcome message sent to ${phoneNumber}`);
-                    } catch (welcomeError) {
-                        console.error('[SessionManager] Failed to send welcome message:', welcomeError);
-                    }
-
-                    if (onConnected) {
-                        onConnected({
-                            sessionId,
-                            phoneNumber,
-                            name: sock.user?.name,
-                            device: sock.user?.device
-                        });
-                    }
-                }
-            });
+            sock.ev.on('connection.update', (update) => this._handleConnectionUpdate(update, sessionId, callbacks, sock));
 
             // Save credentials when updated
             sock.ev.on('creds.update', saveCreds);
@@ -294,8 +150,119 @@ class SessionManager {
 
         } catch (error) {
             console.error(`[SessionManager] Error creating session ${sessionId}:`, error);
-            this.initializingSessions.delete(sessionId); // Remove from initializing on error
+            this.initializingSessions.delete(sessionId);
             throw error;
+        }
+    }
+
+    async _handleConnectionUpdate(update, sessionId, callbacks, sock) {
+        const { connection, lastDisconnect, qr } = update;
+        console.log(`[SessionManager] 📡 Connection update for ${sessionId}: connection=${connection}, hasQR=${!!qr}`);
+
+        if (qr) {
+            await this._handleQRUpdate(qr, sessionId, callbacks.onQR);
+        }
+        if (connection === 'close') {
+            await this._handleConnectionClose(lastDisconnect, sessionId, callbacks);
+        }
+        if (connection === 'open') {
+            await this._handleConnectionOpen(sessionId, callbacks.onConnected, sock);
+        }
+    }
+
+    async _handleQRUpdate(qr, sessionId, onQR) {
+        console.log(`[SessionManager] ✅ QR Code generated for ${sessionId}`);
+        const qrDataURL = await QRCode.toDataURL(qr, {
+            errorCorrectionLevel: 'H', type: 'image/png', quality: 0.95, margin: 2, width: 300
+        });
+        this.qrCodes.set(sessionId, qrDataURL);
+        console.log(`[SessionManager] 📱 QR Code stored for ${sessionId}, ready for scanning`);
+        if (onQR) onQR(qrDataURL, qr);
+    }
+
+    async _handleConnectionClose(lastDisconnect, sessionId, callbacks) {
+        const statusCode = (lastDisconnect?.error instanceof Boom) ? lastDisconnect.error.output.statusCode : null;
+        const reason = lastDisconnect?.error?.message || 'Unknown reason';
+        const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+        const shouldReconnect = !isLoggedOut;
+
+        console.log(`[SessionManager] 🔴 Connection CLOSED for ${sessionId}`);
+        console.log(`[SessionManager] Status Code: ${statusCode} (${this.getDisconnectReasonName(statusCode)})`);
+        console.log(`[SessionManager] Reason: ${reason}`);
+        console.log(`[SessionManager] Should Reconnect: ${shouldReconnect}`);
+
+        if (this.reconnectTimers.has(sessionId)) {
+            clearTimeout(this.reconnectTimers.get(sessionId));
+            this.reconnectTimers.delete(sessionId);
+        }
+
+        if (this.removedSessions.has(sessionId)) {
+            console.log(`[SessionManager] Session ${sessionId} was manually removed, skipping reconnect.`);
+            if (callbacks.onDisconnected) callbacks.onDisconnected(lastDisconnect);
+            return;
+        }
+
+        if (isLoggedOut) {
+            console.log(`[SessionManager] 🚪 Session ${sessionId} logged out (unpaired)`);
+            await this.supabase.from('whatsapp_sessions').update({
+                status: 'disconnected', auth_state: null, connected_at: null, updated_at: new Date().toISOString()
+            }).eq('id', sessionId);
+            if (callbacks.onDisconnected) callbacks.onDisconnected(lastDisconnect);
+            return;
+        }
+
+        if (shouldReconnect) {
+            this._scheduleReconnect(sessionId, callbacks);
+        }
+
+        if (callbacks.onDisconnected) callbacks.onDisconnected(lastDisconnect);
+    }
+
+    _scheduleReconnect(sessionId, callbacks) {
+        const retryCount = (callbacks.retryCount || 0) + 1;
+        const maxRetries = callbacks.isNew ? 5 : 100;
+
+        if (retryCount <= maxRetries) {
+            const retryDelay = Math.min(5000 * Math.pow(2, retryCount - 1), 120000);
+            console.log(`[SessionManager] 🔄 Reconnecting ${sessionId} (${retryCount}/${maxRetries}) in ${retryDelay}ms...`);
+            const timer = setTimeout(() => {
+                this.createSession(sessionId, { ...callbacks, retryCount });
+            }, retryDelay);
+            this.reconnectTimers.set(sessionId, timer);
+        } else {
+            console.log(`[SessionManager] ❌ Max reconnection attempts reached for ${sessionId}`);
+        }
+    }
+
+    async _handleConnectionOpen(sessionId, onConnected, sock) {
+        console.log(`[SessionManager] ✨ Connection OPEN for ${sessionId}`);
+        console.log(`[SessionManager] ✅ Successfully paired with: ${sock.user?.id}`);
+        this.qrCodes.delete(sessionId);
+
+        const phoneNumber = sock.user?.id?.split(':')[0];
+        const whatsappId = sock.user?.id;
+        
+        const { error } = await this.supabase.from('whatsapp_sessions').update({
+            status: 'connected', phone_number: phoneNumber, whatsapp_id: whatsappId,
+            last_connected_at: new Date().toISOString(), updated_at: new Date().toISOString()
+        }).eq('id', sessionId);
+
+        if (error) {
+            console.error('[SessionManager] ❌ Failed to update session status:', error.message);
+        } else {
+            console.log('[SessionManager] ✅ Session status updated to connected');
+        }
+
+        try {
+            const welcomeMessage = `✅ تم ربط نظام مدير الأسطول (MyFleet Pro) برقم الواتساب هذا بنجاح!\n\nيمكنك الآن إرسال واستقبال التنبيهات والرسائل التلقائية من خلال النظام. 🚀`;
+            await sock.sendMessage(`${phoneNumber}@s.whatsapp.net`, { text: welcomeMessage });
+            console.log(`[SessionManager] Welcome message sent to ${phoneNumber}`);
+        } catch (welcomeError) {
+            console.error('[SessionManager] Failed to send welcome message:', welcomeError);
+        }
+
+        if (onConnected) {
+            onConnected({ sessionId, phoneNumber, name: sock.user?.name, device: sock.user?.device });
         }
     }
 
@@ -306,143 +273,116 @@ class SessionManager {
      */
     async requestPairingCode(sessionId, phoneNumber) {
         const sock = this.sessions.get(sessionId);
-        if (!sock) {
-            throw new Error('Session not found or not initialized');
-        }
-        if (this.isConnected(sessionId)) {
-            throw new Error('Session already connected');
-        }
+        if (!sock) throw new Error('Session not found or not initialized');
+        if (this.isConnected(sessionId)) throw new Error('Session already connected');
 
         console.log(`[PairingCode] Requesting pairing code for ${sessionId} with phone ${phoneNumber}`);
 
         try {
-            // Normalize phone number - remove all non-digits
-            let cleanPhone = phoneNumber.replace(/\D/g, '');
-
-            // Handle Egyptian numbers starting with 0020 or 20
-            if (cleanPhone.startsWith('0020')) {
-                cleanPhone = cleanPhone.substring(2);
-            }
-
-            // Fix double zeros in local format: 20010... -> 2010...
-            if (cleanPhone.startsWith('200')) {
-                cleanPhone = '20' + cleanPhone.substring(3);
-            }
-
-            // Auto-normalize local format: 010... -> 2010...
-            if (cleanPhone.startsWith('0') && cleanPhone.length === 11) {
-                cleanPhone = '20' + cleanPhone.substring(1);
-            } else if (cleanPhone.length === 10 && /^(10|11|12|15)/.test(cleanPhone)) {
-                // Short local: 10... -> 2010...
-                cleanPhone = '20' + cleanPhone;
-            }
-
-            if (cleanPhone.length < 10) {
-                throw new Error('رقم الهاتف غير صحيح. يرجى التأكد من كتابته بالصيغة الدولية الصحيحة بدون + أو أصفار زائدة.');
-            }
-
+            const cleanPhone = this._normalizePhoneNumber(phoneNumber);
             console.log(`[PairingCode] Requesting code for: ${cleanPhone}`);
 
-            // 🔑 IMPORTANT: Clear stale auth before pairing to avoid conflicts
-            const sessionPath = path.join(this.authDir, sessionId);
-            if (fs.existsSync(sessionPath)) {
-                const credsPath = path.join(sessionPath, 'creds.json');
-                if (fs.existsSync(credsPath)) {
-                    try {
-                        const credsData = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
-                        // If creds show registered=false with a stale pairingCode, clear it
-                        if (credsData.registered === false && credsData.pairingCode) {
-                            console.log(`[PairingCode] ⚠️ Found stale pairing data, clearing auth files...`);
-                            fs.rmSync(sessionPath, { recursive: true, force: true });
-                            fs.mkdirSync(sessionPath, { recursive: true });
-                            // Need to recreate the session with fresh auth
-                            throw new Error('STALE_CREDS_CLEARED');
-                        }
-                    } catch (parseErr) {
-                        if (parseErr.message === 'STALE_CREDS_CLEARED') throw parseErr;
-                        console.warn(`[PairingCode] Could not read creds.json:`, parseErr.message);
-                    }
-                }
-            }
+            this._clearStaleAuthForPairing(sessionId);
+            await this._waitForSocketReady(sock);
 
-            // Wait for socket to be ready
-            let retries = 0;
-            const maxRetries = 40;
-            let socketReady = false;
-
-            console.log(`[PairingCode] Waiting for socket to be ready...`);
-
-            while (retries < maxRetries && !socketReady) {
-                const wsState = sock.ws?.readyState;
-
-                if (typeof sock.requestPairingCode === 'function') {
-                    if (wsState === 1) { // OPEN
-                        socketReady = true;
-                        console.log(`[PairingCode] Socket is OPEN and ready`);
-                        break;
-                    } else if (wsState === 0) { // CONNECTING
-                        console.log(`[PairingCode] Socket is CONNECTING, waiting...`);
-                        await new Promise(resolve => setTimeout(resolve, 300));
-                    } else if (wsState === 3) { // CLOSED
-                        console.log(`[PairingCode] Socket is CLOSED, waiting for reconnect...`);
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                    } else {
-                        await new Promise(resolve => setTimeout(resolve, 300));
-                    }
-                } else {
-                    console.warn(`[PairingCode] requestPairingCode method not available yet`);
-                    await new Promise(resolve => setTimeout(resolve, 300));
-                }
-
-                retries++;
-            }
-
-            if (!socketReady) {
-                console.warn(`[PairingCode] Socket not fully ready after ${maxRetries} attempts, but proceeding anyway...`);
-            }
-
-            // Additional wait to ensure socket is fully initialized
             console.log(`[PairingCode] Waiting additional 3 seconds for socket to stabilize...`);
             await new Promise(resolve => setTimeout(resolve, 3000));
-
             console.log(`[PairingCode] Requesting code for phone: ${cleanPhone}`);
             console.log(`[PairingCode] Socket state: ${sock.ws?.readyState}`);
             console.log(`[PairingCode] User ID: ${sock.user?.id || 'not set'}`);
 
-            // Request pairing code from Baileys
             const code = await sock.requestPairingCode(cleanPhone);
-
-            if (!code) {
-                throw new Error('Failed to generate pairing code - no code returned');
-            }
+            if (!code) throw new Error('Failed to generate pairing code - no code returned');
 
             console.log(`[PairingCode] ✅ Successfully generated code for ${sessionId}: ${code}`);
-            console.log(`[PairingCode] 📱 Notification should be sent to WhatsApp for phone: ${cleanPhone}`);
-            console.log(`[PairingCode] 💡 The user should see a notification on their WhatsApp asking to link the device`);
-            console.log(`[PairingCode] 📲 User needs to: 1) Open the notification, 2) Tap "Confirm", 3) Enter the code: ${code}`);
-
             return code;
         } catch (error) {
-            console.error(`[PairingCode] ❌ Error for ${sessionId}:`, error.message);
-
-            // If stale creds were cleared, instruct to retry
-            if (error.message === 'STALE_CREDS_CLEARED') {
-                throw new Error('تم مسح بيانات قديمة. يرجى حذف الجلسة وإعادة إنشائها ثم المحاولة مرة أخرى.');
-            }
-
-            // Provide more helpful error messages
-            if (error.message.includes('not found') || error.message.includes('not initialized')) {
-                throw new Error('الجلسة غير مهيأة. يرجى إعادة المحاولة بعد إنشاء الجلسة.');
-            } else if (error.message.includes('already connected')) {
-                throw new Error('الجلسة متصلة بالفعل.');
-            } else if (error.message.includes('timeout')) {
-                throw new Error('انتهت مهلة الاتصال. يرجى المحاولة مرة أخرى.');
-            } else if (error.message.includes('Invalid phone')) {
-                throw new Error('رقم الهاتف غير صحيح. استخدم الصيغة الدولية بدون +');
-            }
-
-            throw new Error(`فشل في توليد كود الربط: ${error.message}`);
+            this._handlePairingError(error, sessionId);
         }
+    }
+
+    _normalizePhoneNumber(phoneNumber) {
+        let cleanPhone = phoneNumber.replaceAll(/\D/g, '');
+        if (cleanPhone.startsWith('0020')) cleanPhone = cleanPhone.substring(2);
+        if (cleanPhone.startsWith('200')) cleanPhone = '20' + cleanPhone.substring(3);
+        
+        if (cleanPhone.startsWith('0') && cleanPhone.length === 11) {
+            cleanPhone = '20' + cleanPhone.substring(1);
+        } else if (cleanPhone.length === 10 && /^(10|11|12|15)/.test(cleanPhone)) {
+            cleanPhone = '20' + cleanPhone;
+        }
+
+        if (cleanPhone.length < 10) {
+            throw new Error('رقم الهاتف غير صحيح. يرجى التأكد من كتابته بالصيغة الدولية الصحيحة بدون + أو أصفار زائدة.');
+        }
+        return cleanPhone;
+    }
+
+    _clearStaleAuthForPairing(sessionId) {
+        const sessionPath = path.join(this.authDir, sessionId);
+        if (!fs.existsSync(sessionPath)) return;
+        
+        const credsPath = path.join(sessionPath, 'creds.json');
+        if (!fs.existsSync(credsPath)) return;
+
+        try {
+            const credsData = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
+            if (credsData.registered === false && credsData.pairingCode) {
+                console.log(`[PairingCode] ⚠️ Found stale pairing data, clearing auth files...`);
+                fs.rmSync(sessionPath, { recursive: true, force: true });
+                fs.mkdirSync(sessionPath, { recursive: true });
+                throw new Error('STALE_CREDS_CLEARED');
+            }
+        } catch (parseErr) {
+            if (parseErr.message === 'STALE_CREDS_CLEARED') throw parseErr;
+            console.warn(`[PairingCode] Could not read creds.json:`, parseErr.message);
+        }
+    }
+
+    async _waitForSocketReady(sock) {
+        let retries = 0;
+        const maxRetries = 40;
+        
+        console.log(`[PairingCode] Waiting for socket to be ready...`);
+        while (retries < maxRetries) {
+            const wsState = sock.ws?.readyState;
+            if (typeof sock.requestPairingCode === 'function') {
+                if (wsState === 1) { // OPEN
+                    console.log(`[PairingCode] Socket is OPEN and ready`);
+                    return true;
+                } else if (wsState === 0) { // CONNECTING
+                    console.log(`[PairingCode] Socket is CONNECTING, waiting...`);
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                } else if (wsState === 3) { // CLOSED
+                    console.log(`[PairingCode] Socket is CLOSED, waiting for reconnect...`);
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                } else {
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                }
+            } else {
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+            retries++;
+        }
+        console.warn(`[PairingCode] Socket not fully ready after ${maxRetries} attempts, but proceeding anyway...`);
+        return false;
+    }
+
+    _handlePairingError(error, sessionId) {
+        console.error(`[PairingCode] ❌ Error for ${sessionId}:`, error.message);
+        if (error.message === 'STALE_CREDS_CLEARED') {
+            throw new Error('تم مسح بيانات قديمة. يرجى حذف الجلسة وإعادة إنشائها ثم المحاولة مرة أخرى.');
+        }
+        if (error.message.includes('not found') || error.message.includes('not initialized')) {
+            throw new Error('الجلسة غير مهيأة. يرجى إعادة المحاولة بعد إنشاء الجلسة.');
+        } else if (error.message.includes('already connected')) {
+            throw new Error('الجلسة متصلة بالفعل.');
+        } else if (error.message.includes('timeout')) {
+            throw new Error('انتهت مهلة الاتصال. يرجى المحاولة مرة أخرى.');
+        } else if (error.message.includes('Invalid phone')) {
+            throw new Error('رقم الهاتف غير صحيح. استخدم الصيغة الدولية بدون +');
+        }
+        throw new Error(`فشل في توليد كود الربط: ${error.message}`);
     }
 
     /**
@@ -513,7 +453,7 @@ class SessionManager {
      */
     getSessionInfo(sessionId) {
         const session = this.sessions.get(sessionId);
-        if (!session || !session.user) {
+        if (!session?.user) {
             return null;
         }
 
@@ -596,7 +536,7 @@ class SessionManager {
         for (const [sessionId, sock] of this.sessions.entries()) {
             sessions.push({
                 sessionId,
-                connected: sock.user ? true : false,
+                connected: !!sock.user,
                 phoneNumber: sock.user?.id?.split(':')[0],
                 name: sock.user?.name
             });
