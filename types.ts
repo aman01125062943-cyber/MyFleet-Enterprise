@@ -70,6 +70,7 @@ export interface Transaction {
   reason?: string;
   date: string;
   created_at?: string;
+  deleted_at?: string;
   car_name?: string;
   category?: string;
   notes?: string;

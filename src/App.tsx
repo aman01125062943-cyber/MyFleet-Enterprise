@@ -11,6 +11,7 @@ const Dashboard = React.lazy(() => import('./components/Dashboard'));
 const LandingPage = React.lazy(() => import('./components/LandingPage'));
 const PricingPage = React.lazy(() => import('./components/PricingPage'));
 const MaintenancePage = React.lazy(() => import('./components/Maintenance'));
+const GlobalTrash = React.lazy(() => import('./components/GlobalTrash'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -37,6 +38,7 @@ function App() {
           {/* Protected App Routes - Wrapped with ProtectedRoute */}
           <Route element={<Layout />}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/trash" element={<GlobalTrash />} />
           </Route>
 
           {/* Catch all */}

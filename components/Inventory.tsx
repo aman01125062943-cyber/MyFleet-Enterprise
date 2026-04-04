@@ -55,7 +55,9 @@ const Inventory: React.FC = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [targetDeleteId, setTargetDeleteId] = useState<string | null>(null);
     const [deleteType, setDeleteType] = useState<'car' | 'transaction'>('transaction');
-    const [showCategoryDropdown, setShowCategoryDropdown] = useState(false); // New State for Custom Dropdowns
+    const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+    const [showTrash, setShowTrash] = useState(false);
+    const [trashTxs, setTrashTxs] = useState<Transaction[]>([]); // New State for soft-deleted transactions
     // Data Placeholders
     const [currentCar, setCurrentCar] = useState<Car>({
         id: '', make: '', model: '', plate_number: '', year: '',
@@ -75,6 +77,7 @@ const Inventory: React.FC = () => {
     const [reportTxTypeFilter, setReportTxTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     const [selectedMonth, setSelectedMonth] = useState<number | null>(null); // null = جميع الشهور
+    const [reportViewMode, setReportViewMode] = useState<'detailed' | 'summary'>('detailed'); // New state for report display mode
 
     // Transaction Editing State
     const [editingTxId, setEditingTxId] = useState<string | null>(null);
@@ -117,6 +120,7 @@ const Inventory: React.FC = () => {
         const { data } = await supabase.from('transactions')
             .select('*')
             .eq('car_id', car.id)
+            .is('deleted_at', null)
             .order('date', { ascending: false });
 
         if (data) {
@@ -131,9 +135,40 @@ const Inventory: React.FC = () => {
     };
 
     const getCategoryLabel = (type: 'income' | 'expense', id: string) => {
+        // 1. Try specified type first
         const cats = (activeCategories as any)[type] || [];
         const cat = cats.find((c: any) => c.id === id);
-        return cat ? cat.label : id;
+        if (cat) return cat.label;
+
+        // 2. Fallback: Search in the other type (handles cases where type was incorrectly assigned)
+        const otherType = type === 'income' ? 'expense' : 'income';
+        const otherCats = (activeCategories as any)[otherType] || [];
+        const otherCat = otherCats.find((c: any) => c.id === id);
+        if (otherCat) return otherCat.label;
+
+        // 3. Last fallback: return the original ID if not found
+        return id;
+    };
+
+    const getCategorySummaries = (transactions: Transaction[]) => {
+        const summaries: Record<string, { id: string, label: string, type: string, amount: number, count: number }> = {};
+        
+        transactions.forEach(t => {
+            const catId = t.category || 'other';
+            if (!summaries[catId]) {
+                summaries[catId] = {
+                    id: catId,
+                    label: getCategoryLabel(t.type, catId),
+                    type: t.type,
+                    amount: 0,
+                    count: 0
+                };
+            }
+            summaries[catId].amount += Number(t.amount);
+            summaries[catId].count += 1;
+        });
+
+        return Object.values(summaries).sort((a, b) => b.amount - a.amount);
     };
 
     const fetchData = async (orgId: string) => {
@@ -146,7 +181,7 @@ const Inventory: React.FC = () => {
         if (navigator.onLine) {
             // Fetch from Supabase
             const { data: remoteCars } = await supabase.from('cars').select('*').eq('org_id', orgId).order('created_at', { ascending: false });
-            const { data: remoteTxs } = await supabase.from('transactions').select('car_id, type, amount').eq('org_id', orgId);
+            const { data: remoteTxs } = await supabase.from('transactions').select('car_id, type, amount').eq('org_id', orgId).is('deleted_at', null);
 
             carsData = remoteCars || [];
             txData = remoteTxs || [];
@@ -326,8 +361,10 @@ const Inventory: React.FC = () => {
                     throw error;
                 }
             } else if (deleteType === 'transaction') {
-                // Delete Transaction
-                const { error } = await supabase.from('transactions').delete().eq('id', targetDeleteId);
+                // Soft-Delete Transaction (Move to Trash)
+                const { error } = await supabase.from('transactions')
+                    .update({ deleted_at: new Date().toISOString() })
+                    .eq('id', targetDeleteId);
 
                 if (!error) {
                     if (selectedReportCar && showReportModal) {
@@ -336,6 +373,8 @@ const Inventory: React.FC = () => {
                     if (user?.org_id) fetchData(user.org_id);
                     setShowDeleteModal(false);
                     setTargetDeleteId(null);
+                    setSuccessMsg('تم نقل السجل إلى سلة المهملات ✨');
+                    setTimeout(() => setSuccessMsg(null), 3000);
                 } else {
                     throw error;
                 }
@@ -373,6 +412,40 @@ const Inventory: React.FC = () => {
             date: tx.date
         });
         setShowAddTx(true);
+    };
+
+    const handleRestoreTransaction = async (txId: string) => {
+        if (isReadOnly) return;
+        setSaveLoading(true);
+        const { error } = await supabase.from('transactions')
+            .update({ deleted_at: null })
+            .eq('id', txId);
+
+        if (!error) {
+            if (selectedReportCar && showReportModal) {
+                await handleOpenReport(selectedReportCar, false);
+            }
+            if (user?.org_id) fetchData(user.org_id);
+            setSuccessMsg('تم استعادة السجل بنجاح ✨');
+            setTimeout(() => setSuccessMsg(null), 3000);
+        }
+        setSaveLoading(false);
+    };
+
+    const confirmPermanentDelete = async (txId: string) => {
+        if (isReadOnly || !window.confirm('هل أنت متأكد من حذف هذا السجل نهائياً؟ لا يمكن التراجع!')) return;
+        setSaveLoading(true);
+        const { error } = await supabase.from('transactions').delete().eq('id', txId);
+
+        if (!error) {
+            if (selectedReportCar && showReportModal) {
+                await handleOpenReport(selectedReportCar, false);
+            }
+            if (user?.org_id) fetchData(user.org_id);
+            setSuccessMsg('تم الحذف النهائي بنجاح');
+            setTimeout(() => setSuccessMsg(null), 3000);
+        }
+        setSaveLoading(false);
     };
 
     const handleSaveTx = async (e: React.FormEvent) => {
@@ -448,18 +521,14 @@ const Inventory: React.FC = () => {
     };
 
     const applyTemplate = (template: ExpenseTemplate) => {
-        // Resolve Category: Check if it matches an ID in activeCategories, if so use Label, else use raw string
-        const cats = (activeCategories as any)[template.type] || [];
-        const matchingCat = cats.find((c: any) => c.id === template.category);
-        const resolvedCategory = matchingCat ? matchingCat.label : template.category;
-
+        // Apply template values directly to newTx state
         setNewTx({
             ...newTx,
             type: template.type, // Ensure type matches template
             amount: template.amount.toString(),
-            category: resolvedCategory,
+            category: template.category, // Use ID from template
             notes: template.title + (newTx.notes ? ` - ${newTx.notes}` : ''),
-            date: new Date().toLocaleDateString('en-CA') // Force Today
+            date: newTx.date || new Date().toLocaleDateString('en-CA') // Keep existing date if editing, otherwise today
         });
     };
 
@@ -917,12 +986,12 @@ const Inventory: React.FC = () => {
             {/* 2. ADD / EDIT TRANSACTION MODAL (Updated Z-Index) */}
             {showAddTx && (
                 <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-start sm:items-center justify-center p-4 overflow-y-auto pb-20 sm:pb-4"
                     onClick={(e) => {
                         if (e.target === e.currentTarget) setShowAddTx(false);
                     }}
                 >
-                    <div className="bg-white dark:bg-[#1e293b] w-[95%] md:w-full max-w-sm rounded-2xl p-5 md:p-6 shadow-2xl border border-gray-200 dark:border-slate-700 animate-in zoom-in-95 relative">
+                    <div className="bg-white dark:bg-[#1e293b] w-[95%] md:w-full max-w-sm rounded-2xl p-5 md:p-6 shadow-2xl border border-gray-200 dark:border-slate-700 animate-in zoom-in-95 relative my-auto">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                                 {newTx.type === 'income' ? <TrendingUp className="text-emerald-500" /> : <TrendingDown className="text-red-500" />}
@@ -996,7 +1065,7 @@ const Inventory: React.FC = () => {
                                             type="text"
                                             className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-r-xl p-3 outline-none text-slate-800 dark:text-white focus:border-blue-500 font-bold"
                                             placeholder="اختر أو اكتب..."
-                                            value={newTx.category}
+                                            value={getCategoryLabel(newTx.type, newTx.category)}
                                             onChange={e => setNewTx({ ...newTx, category: e.target.value })}
                                             onFocus={() => setShowCategoryDropdown(true)}
                                         />
@@ -1017,7 +1086,7 @@ const Inventory: React.FC = () => {
                                                         key={cat.id}
                                                         type="button"
                                                         onClick={() => {
-                                                            setNewTx({ ...newTx, category: cat.label });
+                                                            setNewTx({ ...newTx, category: cat.id });
                                                             setShowCategoryDropdown(false);
                                                         }}
                                                         className="w-full text-right px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 border-b border-gray-50 dark:border-slate-700/50 last:border-0 transition"
@@ -1170,6 +1239,22 @@ const Inventory: React.FC = () => {
                                             <Filter className="w-3.5 h-3.5" />
                                         </div>
                                     </div>
+
+                                    {/* Summary/Detailed Toggle */}
+                                    <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl shrink-0">
+                                        <button 
+                                            onClick={() => setReportViewMode('detailed')} 
+                                            className={`px-3 py-2 rounded-lg text-xs font-bold transition whitespace-nowrap flex items-center gap-1.5 ${reportViewMode === 'detailed' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+                                        >
+                                            <Search className="w-3.5 h-3.5" /> تفصيلي
+                                        </button>
+                                        <button 
+                                            onClick={() => setReportViewMode('summary')} 
+                                            className={`px-3 py-2 rounded-lg text-xs font-bold transition whitespace-nowrap flex items-center gap-1.5 ${reportViewMode === 'summary' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+                                        >
+                                            <PieChart className="w-3.5 h-3.5" /> ملخص
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {/* Action Buttons */}
@@ -1179,6 +1264,18 @@ const Inventory: React.FC = () => {
                                     </button>
                                     <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow hover:shadow-lg transition">
                                         <Printer className="w-3.5 h-3.5" /> طباعة
+                                    </button>
+                                    <button 
+                                        onClick={async () => {
+                                            if (!showTrash && selectedReportCar) {
+                                                const { data } = await supabase.from('transactions').select('*').eq('car_id', selectedReportCar.id).not('deleted_at', 'is', null);
+                                                if (data) setTrashTxs(data as Transaction[]);
+                                            }
+                                            setShowTrash(!showTrash);
+                                        }} 
+                                        className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow transition ${showTrash ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" /> {showTrash ? 'إغلاق السلة' : 'سلة المهملات'}
                                     </button>
                                 </div>
                             </div>
@@ -1247,7 +1344,7 @@ const Inventory: React.FC = () => {
                                         <div className="bg-white dark:bg-[#1e293b] rounded-2xl border border-gray-200 dark:border-slate-700 overflow-hidden shadow-sm print:shadow-none print:border-none print:overflow-visible">
                                             <div className="p-4 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-800/50 print:bg-transparent">
                                                 <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 print:text-black">
-                                                    <FileBarChart className="w-5 h-5 text-blue-500" /> التقرير الشهري للعام {new Date().getFullYear()}
+                                                    <FileBarChart className="w-5 h-5 text-blue-500" /> التقرير الشهري للعام {selectedYear}
                                                 </h3>
                                                 <span className="text-xs font-bold bg-white dark:bg-slate-700 px-2 py-1 rounded-lg text-slate-500 border border-slate-200 dark:border-slate-600">
                                                     {monthlyData.filter(m => m.transactions.length > 0).length} شهر به حركات
@@ -1339,6 +1436,83 @@ const Inventory: React.FC = () => {
                                                         </div>
                                                     ))}
                                                 </div>
+                                            </div>
+                                        </div>
+                                    ) : reportViewMode === 'summary' ? (
+                                        <div className="space-y-6">
+                                            {/* Summary Cards Grid */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                                {getCategorySummaries(filteredHist).map((sum) => {
+                                                    const maxAmount = Math.max(...getCategorySummaries(filteredHist).map(s => s.amount));
+                                                    const percentage = (sum.amount / maxAmount) * 100;
+                                                    const colorClass = sum.type === 'income' ? 'emerald' : 
+                                                                     (sum.id.includes('fuel') || sum.id === 'وقود' ? 'orange' : 
+                                                                     (sum.id.includes('maintenance') || sum.id === 'صيانة' ? 'red' : 
+                                                                     (sum.id.includes('oil') || sum.id === 'زيوت' ? 'amber' : 'blue')));
+                                                    
+                                                    return (
+                                                        <div key={sum.id} className="bg-white dark:bg-[#1e293b] p-6 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
+                                                            <div className={`absolute top-0 right-0 w-24 h-24 bg-${colorClass}-500/5 rounded-full -mr-8 -mt-8 group-hover:scale-110 transition-transform`}></div>
+                                                            <div className="relative z-10">
+                                                                <div className="flex justify-between items-start mb-4">
+                                                                    <div className={`p-3 bg-${colorClass}-50 dark:bg-${colorClass}-900/20 rounded-2xl`}>
+                                                                        {sum.id.includes('fuel') || sum.id === 'وقود' ? <Gauge className="w-5 h-5 text-orange-500" /> : 
+                                                                         sum.id.includes('maintenance') || sum.id === 'صيانة' ? <AlertTriangle className="w-5 h-5 text-red-500" /> : 
+                                                                         sum.id.includes('oil') || sum.id === 'زيوت' ? <TrendingDown className="w-5 h-5 text-amber-500" /> :
+                                                                         sum.type === 'income' ? <TrendingUp className="w-5 h-5 text-emerald-500" /> : 
+                                                                         <PieChart className="w-5 h-5 text-blue-500" />}
+                                                                    </div>
+                                                                    <div className="text-right">
+                                                                        <div className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1">
+                                                                            {sum.count} عمليات
+                                                                        </div>
+                                                                        <div className="text-2xl font-bold font-mono text-slate-800 dark:text-white">
+                                                                            {sum.amount.toLocaleString()}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                <h4 className="font-bold text-slate-700 dark:text-slate-300 text-lg mb-4">{sum.label}</h4>
+                                                                
+                                                                <div className="space-y-2">
+                                                                    <div className="flex justify-between text-[10px] font-bold text-slate-500/60 uppercase tracking-tighter">
+                                                                        <span>نسبة المصروف</span>
+                                                                        <span>{Math.round(percentage)}%</span>
+                                                                    </div>
+                                                                    <div className="h-1.5 bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                                        <div 
+                                                                            className={`h-full bg-${colorClass}-500 transition-all duration-1000`} 
+                                                                            style={{ width: `${percentage}%` }}
+                                                                        ></div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            
+                                            {/* Summary Table for Print */}
+                                            <div className="hidden print:block mt-8 border-t-2 border-slate-200 pt-6">
+                                                <h3 className="text-xl font-bold mb-4">ملخص الإجمالي لكل تصنيف</h3>
+                                                <table className="w-full text-right">
+                                                    <thead>
+                                                        <tr className="border-b-2 border-slate-300">
+                                                            <th className="py-2">التصنيف</th>
+                                                            <th className="py-2">العدد</th>
+                                                            <th className="py-2 text-left">الإجمالي</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {getCategorySummaries(filteredHist).map(sum => (
+                                                            <tr key={sum.id} className="border-b border-slate-100">
+                                                                <td className="py-2 font-bold">{sum.label}</td>
+                                                                <td className="py-2">{sum.count}</td>
+                                                                <td className="py-2 text-left font-bold font-mono">{sum.amount.toLocaleString()}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
                                             </div>
                                         </div>
                                     ) : (
@@ -1457,6 +1631,80 @@ const Inventory: React.FC = () => {
                                                             لا توجد سجلات لعرضها
                                                         </div>
                                                     )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Trash Bin Section (Shown when showTrash is true) */}
+                                    {showTrash && selectedReportCar && (
+                                        <div className="mt-8 animate-in slide-in-from-top-4">
+                                            <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 rounded-2xl overflow-hidden shadow-sm print:hidden">
+                                                <div className="p-4 border-b border-orange-100 dark:border-orange-900/30 flex justify-between items-center bg-orange-100/50 dark:bg-orange-900/20">
+                                                    <h3 className="font-bold text-orange-800 dark:text-orange-400 flex items-center gap-2">
+                                                        <Trash2 className="w-5 h-5" /> المحذوفات (سلة المهملات)
+                                                    </h3>
+                                                    <span className="text-[10px] bg-white dark:bg-slate-800 px-2 py-1 rounded-lg text-orange-600 border border-orange-200 dark:border-orange-800 font-bold">
+                                                        سجلات يمكنك استعادتها
+                                                    </span>
+                                                </div>
+
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-right text-sm">
+                                                        <thead className="bg-orange-50 dark:bg-orange-900/5 text-orange-800/60 font-bold border-b border-orange-100 dark:border-orange-900/20">
+                                                            <tr>
+                                                                <th className="p-4 whitespace-nowrap">التاريخ</th>
+                                                                <th className="p-4">النوع</th>
+                                                                <th className="p-4">التصنيف</th>
+                                                                <th className="p-4 w-1/3">ملاحظات</th>
+                                                                <th className="p-4 text-left">المبلغ</th>
+                                                                <th className="p-4 text-center">إجراءات</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-orange-100 dark:divide-orange-900/20">
+                                                            {trashTxs.map(t => (
+                                                                <tr key={t.id} className="hover:bg-orange-100/30 transition text-orange-900 dark:text-orange-200">
+                                                                    <td className="p-4 font-mono whitespace-nowrap opacity-60">{t.date}</td>
+                                                                    <td className="p-4">
+                                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${t.type === 'income' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                                                            {t.type === 'income' ? 'وارد' : 'منصرف'}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="p-4 font-bold">{getCategoryLabel(t.type, t.category || '')}</td>
+                                                                    <td className="p-4 text-xs opacity-70">{t.notes || '-'}</td>
+                                                                    <td className="p-4 text-left font-bold font-mono">{Number(t.amount).toLocaleString()}</td>
+                                                                    <td className="p-4 flex justify-center gap-2">
+                                                                        <button 
+                                                                            onClick={async () => {
+                                                                                await handleRestoreTransaction(t.id);
+                                                                                setTrashTxs(prev => prev.filter(item => item.id !== t.id));
+                                                                            }} 
+                                                                            className="px-3 py-1 bg-blue-600 text-white rounded-lg text-[10px] font-bold shadow-md hover:bg-blue-500 transition"
+                                                                        >
+                                                                            استعادة
+                                                                        </button>
+                                                                        <button 
+                                                                            onClick={async () => {
+                                                                                await confirmPermanentDelete(t.id);
+                                                                                setTrashTxs(prev => prev.filter(item => item.id !== t.id));
+                                                                            }} 
+                                                                            className="p-1 px-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition" 
+                                                                            title="حذف نهائي"
+                                                                        >
+                                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                            {trashTxs.length === 0 && (
+                                                                <tr>
+                                                                    <td colSpan={6} className="p-10 text-center text-orange-400 text-xs font-bold">
+                                                                        سلة المهملات فارغة
+                                                                    </td>
+                                                                </tr>
+                                                            )}
+                                                        </tbody>
+                                                    </table>
                                                 </div>
                                             </div>
                                         </div>
