@@ -62,6 +62,16 @@ class SessionManager {
 
             // Create session directory
             const sessionPath = path.join(this.authDir, sessionId);
+
+            // 🔑 KEY FIX: If this is a NEW session (not a retry/restore), clear stale auth files
+            // Stale creds.json causes Baileys to resume a dead session instead of generating fresh QR
+            if (callbacks.isNew && !callbacks.retryCount) {
+                if (fs.existsSync(sessionPath)) {
+                    console.log(`[SessionManager] 🗑️ Clearing stale auth files for NEW session ${sessionId}`);
+                    fs.rmSync(sessionPath, { recursive: true, force: true });
+                }
+            }
+
             if (!fs.existsSync(sessionPath)) {
                 fs.mkdirSync(sessionPath, { recursive: true });
             }
@@ -93,12 +103,13 @@ class SessionManager {
                 syncFullHistory: false,
                 markOnlineOnConnect: true,
                 generateHighQualityLinkPreview: false,
-                qrTimeout: 120000,
-                connectTimeoutMs: 120000,
+                qrTimeout: 180000,
+                connectTimeoutMs: 180000,
                 defaultQueryTimeoutMs: 120000,
                 keepAliveIntervalMs: 10000,
                 retryRequestDelayMs: 2000,
                 maxMsgRetryCount: 5,
+                emitOwnEvents: true,
                 getMessage: async () => ({ conversation: '' })
             });
 
@@ -332,9 +343,31 @@ class SessionManager {
 
             console.log(`[PairingCode] Requesting code for: ${cleanPhone}`);
 
+            // 🔑 IMPORTANT: Clear stale auth before pairing to avoid conflicts
+            const sessionPath = path.join(this.authDir, sessionId);
+            if (fs.existsSync(sessionPath)) {
+                const credsPath = path.join(sessionPath, 'creds.json');
+                if (fs.existsSync(credsPath)) {
+                    try {
+                        const credsData = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
+                        // If creds show registered=false with a stale pairingCode, clear it
+                        if (credsData.registered === false && credsData.pairingCode) {
+                            console.log(`[PairingCode] ⚠️ Found stale pairing data, clearing auth files...`);
+                            fs.rmSync(sessionPath, { recursive: true, force: true });
+                            fs.mkdirSync(sessionPath, { recursive: true });
+                            // Need to recreate the session with fresh auth
+                            throw new Error('STALE_CREDS_CLEARED');
+                        }
+                    } catch (parseErr) {
+                        if (parseErr.message === 'STALE_CREDS_CLEARED') throw parseErr;
+                        console.warn(`[PairingCode] Could not read creds.json:`, parseErr.message);
+                    }
+                }
+            }
+
             // Wait for socket to be ready
             let retries = 0;
-            const maxRetries = 30;
+            const maxRetries = 40;
             let socketReady = false;
 
             console.log(`[PairingCode] Waiting for socket to be ready...`);
@@ -349,16 +382,16 @@ class SessionManager {
                         break;
                     } else if (wsState === 0) { // CONNECTING
                         console.log(`[PairingCode] Socket is CONNECTING, waiting...`);
-                        await new Promise(resolve => setTimeout(resolve, 200));
+                        await new Promise(resolve => setTimeout(resolve, 300));
                     } else if (wsState === 3) { // CLOSED
-                        console.log(`[PairingCode] Socket is CLOSED, this is OK for pairing code`);
-                        await new Promise(resolve => setTimeout(resolve, 200));
+                        console.log(`[PairingCode] Socket is CLOSED, waiting for reconnect...`);
+                        await new Promise(resolve => setTimeout(resolve, 500));
                     } else {
-                        await new Promise(resolve => setTimeout(resolve, 200));
+                        await new Promise(resolve => setTimeout(resolve, 300));
                     }
                 } else {
                     console.warn(`[PairingCode] requestPairingCode method not available yet`);
-                    await new Promise(resolve => setTimeout(resolve, 200));
+                    await new Promise(resolve => setTimeout(resolve, 300));
                 }
 
                 retries++;
@@ -391,7 +424,11 @@ class SessionManager {
             return code;
         } catch (error) {
             console.error(`[PairingCode] ❌ Error for ${sessionId}:`, error.message);
-            console.error(`[PairingCode] Error stack:`, error.stack);
+
+            // If stale creds were cleared, instruct to retry
+            if (error.message === 'STALE_CREDS_CLEARED') {
+                throw new Error('تم مسح بيانات قديمة. يرجى حذف الجلسة وإعادة إنشائها ثم المحاولة مرة أخرى.');
+            }
 
             // Provide more helpful error messages
             if (error.message.includes('not found') || error.message.includes('not initialized')) {
