@@ -283,7 +283,7 @@ class SessionManager {
             console.log(`[PairingCode] Requesting code for: ${cleanPhone}`);
 
             this._clearStaleAuthForPairing(sessionId);
-            await this._waitForSocketReady(sock);
+            await this._waitForSocketReady(sock, sessionId);
 
             console.log(`[PairingCode] Waiting additional 3 seconds for socket to stabilize...`);
             await new Promise(resolve => setTimeout(resolve, 3000));
@@ -339,13 +339,18 @@ class SessionManager {
         }
     }
 
-    async _waitForSocketReady(sock) {
+    async _waitForSocketReady(sock, sessionId) {
         let retries = 0;
-        const maxRetries = 40;
+        const maxRetries = 60;
         
         console.log(`[PairingCode] Waiting for socket to be ready...`);
         while (retries < maxRetries) {
-            const wsState = sock.ws?.readyState;
+            if (this.qrCodes.has(sessionId)) {
+                console.log(`[PairingCode] Socket is ready (verified via QR receipt)`);
+                return true;
+            }
+
+            const wsState = sock.ws?.readyState || sock.ws?.isOpen ? 1 : undefined;
             if (typeof sock.requestPairingCode === 'function') {
                 if (wsState === 1) { // OPEN
                     console.log(`[PairingCode] Socket is OPEN and ready`);
