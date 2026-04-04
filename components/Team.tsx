@@ -621,7 +621,8 @@ const Team: React.FC = () => {
                                 )}
                             </div>
 
-                            {/* Plan Selector - NEW */}
+                            {/* Plan Selector - SUPER ADMIN ONLY */}
+                            {user?.role === 'super_admin' && (
                             <div className="md:col-span-3">
                                 <label className="text-xs font-bold text-slate-500 mb-2 block flex items-center gap-2">
                                     <Crown className="w-4 h-4 text-amber-500" />
@@ -658,6 +659,7 @@ const Team: React.FC = () => {
                                     💡 الصلاحيات تُحدد تلقائياً حسب الباقة المختارة. يمكنك تقليل الصلاحيات لكن لا يمكنك زيادتها عن حدود الباقة.
                                 </p>
                             </div>
+                            )}
 
                             <div>
                                 <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
