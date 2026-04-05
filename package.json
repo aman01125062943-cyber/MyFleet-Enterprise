@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"vite\" \"cd whatsapp-service && npm run dev\"",
+    "dev": "concurrently \"vite\" \"cd whatsapp-service && npm run dev\" \"cd whatsapp-service && node notificationWorker.js\"",
     "start": "cd whatsapp-service && npm start",
     "build": "vite build && cd whatsapp-service && npm install",
     "preview": "vite preview"

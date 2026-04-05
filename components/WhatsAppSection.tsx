@@ -341,7 +341,8 @@ const WhatsAppSection: React.FC = () => {
             }
         } catch (err) {
             console.error('Error requesting pairing code:', err);
-            alert('حدث خطأ أثناء طلب الكود');
+            const msg = err instanceof Error ? err.message.replace(/^API Error:\s*/, '') : 'حدث خطأ أثناء طلب الكود';
+            alert(msg);
         } finally {
             setRequestingCode(false);
         }
@@ -606,6 +607,8 @@ const WhatsAppSection: React.FC = () => {
                                 clearInterval(qrPollingRef.current);
                                 qrPollingRef.current = null;
                             }
+                            // يبدأ اتصال Baileys إن لم يكن قد بدأ (نفس مسار QR) لتجهيز كود الاقتران
+                            void qrApiCall(`/api/sessions/${session.id}/qr`);
                         }
                     }}
                     onPairingPhoneChange={setPairingPhone}

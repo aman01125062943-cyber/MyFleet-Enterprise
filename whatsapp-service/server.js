@@ -146,6 +146,95 @@ async function authenticateJWT(req, res, next) {
     }
 }
 
+/**
+ * Baileys lifecycle hooks for the system WhatsApp session (shared by QR + pairing bootstrap).
+ */
+function buildSystemSessionCallbacks(sessionId) {
+    return {
+        onQR: async () => {
+            console.log(`[Server] ✅ QR generated for ${sessionId}`);
+        },
+        onConnected: async (info) => {
+            console.log(`[Server] ✅ Session ${sessionId} connected to ${info.phoneNumber}`);
+            await supabase.rpc('ensure_system_default_session', {});
+            await supabase
+                .from('whatsapp_sessions')
+                .update({
+                    status: 'connected',
+                    phone_number: info.phoneNumber,
+                    connected_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                    is_system_default: true
+                })
+                .eq('id', sessionId);
+        },
+        onDisconnected: async () => {
+            console.log(`[Server] 🔴 Session ${sessionId} disconnected`);
+            await supabase
+                .from('whatsapp_sessions')
+                .update({
+                    status: 'disconnected',
+                    connected_at: null,
+                    updated_at: new Date().toISOString(),
+                    is_system_default: false
+                })
+                .eq('id', sessionId);
+            await supabase.rpc('ensure_system_default_session', {});
+        }
+    };
+}
+
+/**
+ * Ensures Baileys socket exists in memory before pairing / QR-dependent actions.
+ * Pairing used to fail if the client opened "كود الاقتران" before any GET /qr (socket never started).
+ */
+async function ensureWhatsAppSocketReady(sessionId) {
+    if (sessionManager.isConnected(sessionId)) {
+        throw new Error('الجلسة متصلة بالفعل.');
+    }
+    if (sessionManager.getSession(sessionId)) {
+        return;
+    }
+
+    const { data: dbSession, error: dbErr } = await supabase
+        .from('whatsapp_sessions')
+        .select('id')
+        .eq('id', sessionId)
+        .single();
+
+    if (dbErr || !dbSession) {
+        throw new Error('الجلسة غير موجودة في قاعدة البيانات.');
+    }
+
+    let state = sessionManager.getSessionState(sessionId);
+    if (state === 'not_started') {
+        console.log(`[Socket] Bootstrapping Baileys for ${sessionId} (pairing/QR prerequisite)`);
+        await sessionManager.createSession(sessionId, {
+            isNew: true,
+            ...buildSystemSessionCallbacks(sessionId)
+        });
+        return;
+    }
+
+    const deadline = Date.now() + 90000;
+    while (Date.now() < deadline) {
+        if (sessionManager.getSession(sessionId)) {
+            return;
+        }
+        state = sessionManager.getSessionState(sessionId);
+        if (state === 'not_started') {
+            await sessionManager.createSession(sessionId, {
+                isNew: true,
+                ...buildSystemSessionCallbacks(sessionId)
+            });
+            return;
+        }
+        await new Promise((r) => setTimeout(r, 300));
+    }
+
+    throw new Error('تعذر تهيئة اتصال واتساب خلال المهلة. افتح تبويب «مسح QR» ثم جرّب كود الاقتران مرة أخرى.');
+}
+
 // ==================== API ROUTES ====================
 
 // Health check
@@ -243,9 +332,6 @@ app.post('/test-send-internal', async (req, res) => {
     }
 });
 
-
-// ==================== SESSION ROUTES ====================
-
 // Get all sessions (SYSTEM-WIDE - RETURNS SINGLE SESSION)
 app.get('/api/sessions', authenticateJWT, async (req, res) => {
     try {
@@ -265,12 +351,15 @@ app.get('/api/sessions', authenticateJWT, async (req, res) => {
 
         const result = (sessions || []).map(session => {
             const active = activeMap.get(session.id);
-            const isConnected = active ? active.connected : session.status === 'connected';
+            // Only trust in-memory Baileys state for "connected". DB-only "connected" (e.g. after server restart
+            // without a live socket) produced a false "متصل ونشط" and broke QR/pairing.
+            const isConnected = !!active?.connected;
+            const staleDbMarkedConnected = session.status === 'connected' && !isConnected;
 
             return {
                 ...session,
                 connected: isConnected,
-                status: isConnected ? 'connected' : session.status,
+                status: isConnected ? 'connected' : (staleDbMarkedConnected ? 'disconnected' : session.status),
                 phoneNumber: active?.phoneNumber || session.phone_number,
                 waName: active?.name
             };
@@ -362,42 +451,7 @@ app.get('/api/sessions/:sessionId/qr', authenticateJWT, async (req, res) => {
             // Start connection asynchronously (don't await)
             sessionManager.createSession(sessionId, {
                 isNew: true,
-                onQR: async (qrDataURL, qrText) => {
-                    console.log(`[Server] ✅ QR generated for ${sessionId}`);
-                },
-                onConnected: async (info) => {
-                    console.log(`[Server] ✅ Session ${sessionId} connected to ${info.phoneNumber}`);
-
-                    // Unmark all other sessions as system default, then mark this one
-                    await supabase.rpc('ensure_system_default_session', {});
-                    await supabase
-                        .from('whatsapp_sessions')
-                        .update({
-                            status: 'connected',
-                            phone_number: info.phoneNumber,
-                            connected_at: new Date().toISOString(),
-                            updated_at: new Date().toISOString(),
-                            is_system_default: true  // Mark as system default
-                        })
-                        .eq('id', sessionId);
-                },
-                onDisconnected: async (reason) => {
-                    console.log(`[Server] 🔴 Session ${sessionId} disconnected`);
-
-                    // Remove system default flag when disconnecting
-                    await supabase
-                        .from('whatsapp_sessions')
-                        .update({
-                            status: 'disconnected',
-                            connected_at: null,
-                            updated_at: new Date().toISOString(),
-                            is_system_default: false  // Remove system default flag
-                        })
-                        .eq('id', sessionId);
-
-                    // Try to promote another connected session as system default
-                    await supabase.rpc('ensure_system_default_session', {});
-                }
+                ...buildSystemSessionCallbacks(sessionId)
             }).catch(err => {
                 console.error(`[Server] ❌ Error creating session ${sessionId}:`, err);
             });
@@ -531,6 +585,7 @@ app.post('/api/sessions/:sessionId/pairing-code', authenticateJWT, async (req, r
             return res.status(400).json({ error: 'Phone number is required' });
         }
 
+        await ensureWhatsAppSocketReady(sessionId);
         const code = await sessionManager.requestPairingCode(sessionId, phoneNumber);
         res.json({ success: true, code });
     } catch (error) {
@@ -571,42 +626,7 @@ app.post('/api/sessions/:sessionId/reconnect', authenticateJWT, async (req, res)
         // Create socket for this session
         sessionManager.createSession(sessionId, {
             isNew: true,
-            onQR: async (qrDataURL, qrText) => {
-                console.log(`[Server] QR generated for ${sessionId}`);
-            },
-            onConnected: async (info) => {
-                console.log(`[Server] Session ${sessionId} connected to ${info.phoneNumber}`);
-
-                // Unmark other sessions and mark this one as system default
-                await supabase.rpc('ensure_system_default_session', {});
-                await supabase
-                    .from('whatsapp_sessions')
-                    .update({
-                        status: 'connected',
-                        phone_number: info.phoneNumber,
-                        connected_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString(),
-                        is_system_default: true
-                    })
-                    .eq('id', sessionId);
-            },
-            onDisconnected: async (reason) => {
-                console.log(`[Server] Session ${sessionId} disconnected`);
-
-                // Remove system default flag
-                await supabase
-                    .from('whatsapp_sessions')
-                    .update({
-                        status: 'disconnected',
-                        connected_at: null,
-                        updated_at: new Date().toISOString(),
-                        is_system_default: false
-                    })
-                    .eq('id', sessionId);
-
-                // Promote another connected session as system default
-                await supabase.rpc('ensure_system_default_session', {});
-            }
+            ...buildSystemSessionCallbacks(sessionId)
         });
 
         res.json({ success: true, sessionId, message: 'Session reconnection started' });

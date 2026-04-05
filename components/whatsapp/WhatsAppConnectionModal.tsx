@@ -188,7 +188,7 @@ export const WhatsAppConnectionModal: React.FC<WhatsAppConnectionModalProps> = (
                                             <div className="bg-slate-800/80 rounded-xl p-4 text-center border border-slate-700">
                                                 <p className="text-slate-300 text-sm">
                                                     1. افتح واتساب على هاتفك<br />
-                                                    2. العدادات {'>'} الأجهزة المرتبطة {'>'} ربط جهاز<br />
+                                                    2. الإعدادات {'>'} الأجهزة المرتبطة {'>'} ربط جهاز<br />
                                                     3. اختر "الربط برقم الهاتف" بدلاً من المسح
                                                 </p>
                                             </div>

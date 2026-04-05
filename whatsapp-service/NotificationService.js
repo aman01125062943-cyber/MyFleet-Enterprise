@@ -82,6 +82,30 @@ class NotificationService {
 
         console.log(`[NotificationService] Sending via session: ${sessionId}`);
 
+        // Try to find user metadata for logging
+        let orgId = null;
+        let userId = null;
+        try {
+            const cleanPhone = recipientPhone.replace(/\D/g, '');
+            const phoneVariants = [cleanPhone];
+            if (cleanPhone.startsWith('01')) phoneVariants.push('2' + cleanPhone);
+            if (cleanPhone.startsWith('201')) phoneVariants.push(cleanPhone.substring(1));
+            
+            const { data: profile } = await this.supabase
+                .from('profiles')
+                .select('id, org_id')
+                .or(phoneVariants.map(p => `whatsapp_number.eq.${p}`).join(','))
+                .limit(1)
+                .maybeSingle(); // Use maybeSingle to avoid errors if not found
+            
+            if (profile) {
+                orgId = profile.org_id;
+                userId = profile.id;
+            }
+        } catch (err) {
+            console.warn('[NotificationService] Metadata lookup failed:', err.message);
+        }
+
         try {
             const sock = this.sessionManager.getSession(sessionId);
             if (!sock) throw new Error('Session socket not found');
@@ -103,9 +127,44 @@ class NotificationService {
 
             await sock.sendMessage(formattedPhone, { text: message });
             console.log(`[NotificationService] ✅ Notification sent successfully to ${formattedPhone}`);
+            
+            // Log to database
+            const { error: logErr } = await this.supabase
+                .from('whatsapp_notification_logs')
+                .insert({
+                    notification_type: eventName,
+                    org_id: orgId,
+                    user_id: userId,
+                    phone_number: recipientPhone,
+                    status: 'sent',
+                    sent_at: new Date().toISOString()
+                });
+            
+            if (logErr) {
+                console.error(`[NotificationService] ❌ Failed to log success to DB:`, logErr.message);
+                console.log(`[NotificationService] Hint: Make sure '${eventName}' is in the database constraint and org_id is nullable if missing.`);
+            }
+
             return { success: true, message: 'Sent successfully' };
         } catch (error) {
             console.error(`[NotificationService] ❌ Failed to send notification:`, error);
+            
+            // Log failure to database
+            const { error: logErr } = await this.supabase
+                .from('whatsapp_notification_logs')
+                .insert({
+                    notification_type: eventName,
+                    org_id: orgId,
+                    user_id: userId,
+                    phone_number: recipientPhone,
+                    status: 'failed',
+                    error_message: error.message
+                });
+            
+            if (logErr) {
+                console.error(`[NotificationService] ❌ Failed to log failure to DB:`, logErr.message);
+            }
+
             return { success: false, error: error.message };
         }
     }
