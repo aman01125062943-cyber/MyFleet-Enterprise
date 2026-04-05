@@ -72,6 +72,13 @@ export const getCategorySummaries = (
     return Object.values(summaries).sort((a, b) => b.amount - a.amount);
 };
 
+export const getArabicDayName = (dateStr: string): string => {
+    const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return days[date.getDay()];
+};
+
 export const getArabicMonthName = (index: number) => {
     const months = [
         'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',

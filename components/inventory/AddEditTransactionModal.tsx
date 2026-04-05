@@ -91,11 +91,11 @@ const AddEditTransactionModal: React.FC<AddEditTransactionModalProps> = ({
                                 id="tx-amount"
                                 type="number" 
                                 required 
-                                min="0" 
+                                min="0.01" 
                                 step="0.01" 
                                 className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white font-bold focus:border-blue-500" 
                                 placeholder="0.00" 
-                                value={tx.amount ?? ''} 
+                                value={(tx.amount && tx.amount > 0) ? tx.amount : ''} 
                                 onChange={e => onTxChange({ amount: Number.parseFloat(e.target.value) || 0 })} 
                             />
                         </div>

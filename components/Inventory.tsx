@@ -167,38 +167,78 @@ const Inventory: React.FC = () => {
 
     const handleAddCar = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (isReadOnly || !canAddCar || !user?.org_id) return;
+        const targetOrgId = user?.org_id || org?.id;
+        if (isReadOnly) {
+            alert("لا يمكنك إضافة سيارة لأن حسابك في وضع القراءة فقط.");
+            return;
+        }
+        if (!canAddCar) {
+            alert("ليس لديك صلاحية لإضافة سيارة.");
+            return;
+        }
+        if (!targetOrgId) {
+            alert(`حدث خطأ: لم يتم التعرف على معرف المؤسسة الخاص بك. user.org_id=${user?.org_id}, org.id=${org?.id}`);
+            return;
+        }
         setSaveLoading(true);
-        const carId = crypto.randomUUID();
-        const carData = {
-            ...newCar,
-            id: carId,
-            org_id: user.org_id,
-            name: `${newCar.make} ${newCar.model}`,
-            last_updated: Date.now(),
-            created_at: new Date().toISOString()
-        };
-        await db.cars.add(carData as LocalCar);
-        if (navigator.onLine) await supabase.from('cars').insert(carData);
-        setSaveLoading(false);
-        setShowAddCar(false);
-        fetchData(user.org_id);
+        try {
+            const carId = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') 
+                ? crypto.randomUUID() 
+                : `car-${Date.now()}-${Math.floor(Math.random()*1000000)}`;
+            const carData = {
+                ...newCar,
+                id: carId,
+                org_id: targetOrgId,
+                name: `${newCar.make} ${newCar.model}`,
+                license_expiry: newCar.license_expiry || null,
+                created_at: new Date().toISOString()
+            };
+            await db.cars.add({ ...carData, last_updated: Date.now() } as LocalCar);
+            if (navigator.onLine) {
+                const { error } = await supabase.from('cars').insert(carData);
+                if (error) {
+                    console.error("Supabase Error details:", error);
+                    throw new Error(`خطأ من الخادم (${error.code}): ${error.message}`);
+                }
+            }
+            setShowAddCar(false);
+            fetchData(targetOrgId);
+        } catch (error) {
+            console.error("Error saving car:", error);
+            alert("حدث خطأ أثناء الحفظ: " + (error instanceof Error ? error.message : "يرجى المحاولة مرة أخرى."));
+        } finally {
+            setSaveLoading(false);
+        }
     };
 
     const handleUpdateCar = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (isReadOnly || !canEditCar || !user?.org_id) return;
+        const targetOrgId = user?.org_id || org?.id;
+        if (isReadOnly || !canEditCar || !targetOrgId) return;
         setSaveLoading(true);
-        const { error } = await supabase.from('cars').update({
-            ...currentCar,
-            name: `${currentCar.make} ${currentCar.model}`,
-            last_updated: Date.now()
-        }).eq('id', currentCar.id);
-        if (!error) {
-            setShowEditCar(false);
-            fetchData(user.org_id);
+        try {
+            const updatePayload = {
+                ...currentCar,
+                name: `${currentCar.make} ${currentCar.model}`,
+                license_expiry: currentCar.license_expiry || null
+            };
+            if ('last_updated' in updatePayload) {
+                delete (updatePayload as any).last_updated;
+            }
+            const { error } = await supabase.from('cars').update(updatePayload).eq('id', currentCar.id);
+            if (!error) {
+                setShowEditCar(false);
+                fetchData(targetOrgId);
+            } else {
+                console.error("Supabase Error updating car:", error);
+                alert(`حدث خطأ أثناء التحديث (${error.code}): ${error.message}`);
+            }
+        } catch (error) {
+            console.error("Error updating car:", error);
+            alert("حدث خطأ غير متوقع أثناء التحديث.");
+        } finally {
+            setSaveLoading(false);
         }
-        setSaveLoading(false);
     };
 
     const initiateDeleteCar = useCallback((id: string) => {
@@ -273,25 +313,42 @@ const Inventory: React.FC = () => {
     const handleSaveTx = async (e: React.FormEvent) => {
         e.preventDefault();
         if (isReadOnly || !user?.org_id) return;
+
+        const amount = Number(newTx.amount) || 0;
+        if (amount <= 0) {
+            alert('يرجى إدخال مبلغ صحيح أكبر من الصفر');
+            return;
+        }
+
         setSaveLoading(true);
         try {
+            const targetOrgId = user?.org_id || org?.id;
+            const txId = editingTxId || (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `tx-${Date.now()}-${Math.floor(Math.random()*1000000)}`);
             const txData = {
                 ...newTx,
-                id: editingTxId || crypto.randomUUID(),
-                org_id: user.org_id,
-                user_id: user.id,
-                last_updated: Date.now(),
+                amount,
+                id: txId,
+                org_id: targetOrgId,
+                user_id: user?.id || '',
                 created_at: newTx.created_at || new Date().toISOString()
             };
-            await db.transactions.put(txData as LocalTransaction);
-            if (navigator.onLine) await supabase.from('transactions').upsert(txData);
-            fetchData(user.org_id);
+            
+            await db.transactions.put({ ...txData, last_updated: Date.now() } as LocalTransaction);
+            
+            if (navigator.onLine) {
+                const { error } = await supabase.from('transactions').upsert(txData);
+                if (error) throw error;
+            }
+            fetchData(targetOrgId || '');
             setShowAddTx(false);
+            setSuccessMsg(editingTxId ? 'تم تعديل السجل بنجاح ✨' : (newTx.type === 'income' ? 'تم حفظ الإيراد بنجاح ✨' : 'تم حفظ المصروف بنجاح ✨'));
+            setTimeout(() => setSuccessMsg(null), 3000);
             if (showReportModal && selectedReportCar) {
                 await handleOpenReport(selectedReportCar);
             }
         } catch (err) {
             console.error(err);
+            alert('حدث خطأ أثناء الحفظ، يرجى المحاولة مرة أخرى');
         } finally {
             setSaveLoading(false);
         }

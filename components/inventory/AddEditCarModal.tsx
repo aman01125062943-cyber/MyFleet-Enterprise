@@ -41,7 +41,7 @@ const AddEditCarModal: React.FC<AddEditCarModalProps> = ({
                 <h3 id="modal-title" className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white mb-6 border-b border-gray-100 dark:border-slate-700 pb-4 pr-2">
                     {isEdit ? 'تعديل بيانات السيارة' : 'إضافة سيارة جديدة'}
                 </h3>
-                <form onSubmit={onSubmit} className="space-y-5">
+                <form onSubmit={onSubmit} noValidate className="space-y-5">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label htmlFor="car-make" className="text-xs font-bold text-slate-500 mb-1.5 block">الماركة</label>
@@ -181,8 +181,16 @@ const AddEditCarModal: React.FC<AddEditCarModalProps> = ({
 
                     <div className="flex gap-3 mt-8">
                         <button type="button" onClick={onClose} className="flex-1 py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl font-bold transition">إلغاء</button>
-                        <button type="submit" disabled={saveLoading} className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 transition">
-                            {saveLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isEdit ? 'حفظ التعديلات' : 'إضافة السيارة')}
+                        <button
+                            type="button"
+                            onClick={onSubmit}
+                            disabled={saveLoading}
+                            className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 transition"
+                        >
+                            {saveLoading
+                                ? <Loader2 className="w-5 h-5 animate-spin" />
+                                : <span>{isEdit ? 'حفظ التعديلات' : 'إضافة السيارة'}</span>
+                            }
                         </button>
                     </div>
                 </form>

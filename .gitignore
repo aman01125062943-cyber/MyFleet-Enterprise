@@ -27,3 +27,8 @@ dist-ssr
 # WhatsApp Service
 whatsapp-service/auth_sessions/
 whatsapp-service/node_modules/
+
+# Temporary and sensitive files
+auth_sessions/
+whatsapp-service/test_auth*/
+diff.txt

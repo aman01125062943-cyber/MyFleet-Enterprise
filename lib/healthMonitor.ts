@@ -177,29 +177,47 @@ export async function checkSystemHealth(): Promise<HealthCheckResult | null> {
 /**
  * Check WhatsApp service health
  */
-async function checkWhatsAppHealth(): Promise<void> {
-  // Skip health check if WhatsApp is disabled
-  if (!WHATSAPP_ENABLED) {
-    console.log('⏭️ WhatsApp health check skipped (service disabled)');
+async function handleWhatsAppConnectError(e: unknown): Promise<void> {
+  const err = e as Error;
+  const isConnectionRefused =
+    err.message?.includes('Failed to fetch') ||
+    err.message?.includes('ERR_CONNECTION_REFUSED') ||
+    err.name === 'TimeoutError';
+
+  if (isDev) {
+    if (isConnectionRefused) {
+      console.warn('⚠️ [Dev] WhatsApp service not running on', WHATSAPP_SERVER_URL);
+    }
     return;
   }
 
-  try {
-    const response = await fetch(`${WHATSAPP_SERVER_URL}/health`);
+  await logIncident(
+    'whatsapp_failure',
+    'WhatsApp Service Unreachable',
+    `Cannot connect to WhatsApp service: ${err.message}`,
+    'critical',
+    { error: err.message }
+  );
+}
 
-    if (!response.ok) {
-      if (response.status >= 500) {
-        await logIncident(
-          'whatsapp_failure',
-          'WhatsApp Service Error',
-          `WhatsApp service returned ${response.status}: ${response.statusText}`,
-          'high',
-          { status_code: response.status, url: WHATSAPP_SERVER_URL }
-        );
-      }
+async function checkWhatsAppHealth(): Promise<void> {
+  if (!WHATSAPP_ENABLED || !WHATSAPP_SERVER_URL) return;
+
+  try {
+    const response = await fetch(`${WHATSAPP_SERVER_URL}/health`, {
+      signal: AbortSignal.timeout(5000)
+    });
+
+    if (!response.ok && response.status >= 500 && !isDev) {
+      await logIncident(
+        'whatsapp_failure',
+        'WhatsApp Service Error',
+        `WhatsApp service returned ${response.status}: ${response.statusText}`,
+        'high',
+        { status_code: response.status, url: WHATSAPP_SERVER_URL }
+      );
     }
 
-    // Check for failed messages in the last hour
     const { data: failedMessages, error } = await supabase
       .from('whatsapp_messages')
       .select('id, created_at, error_message')
@@ -217,13 +235,7 @@ async function checkWhatsAppHealth(): Promise<void> {
       );
     }
   } catch (e) {
-    await logIncident(
-      'whatsapp_failure',
-      'WhatsApp Service Unreachable',
-      `Cannot connect to WhatsApp service: ${(e as Error).message}`,
-      'critical',
-      { error: (e as Error).message }
-    );
+    await handleWhatsAppConnectError(e);
   }
 }
 
@@ -333,14 +345,22 @@ async function checkDatabaseHealth(): Promise<void> {
  * Run all health checks once
  */
 export async function runHealthChecks(): Promise<void> {
-  console.log('🔍 Running health checks...');
+  if (isDev) {
+    // Minimal logging in dev
+    await Promise.allSettled([
+      checkWhatsAppHealth(),
+      checkSubscriptionHealth(),
+      checkDatabaseHealth()
+    ]);
+    return;
+  }
 
+  console.log('🔍 Running health checks...');
   await Promise.allSettled([
     checkWhatsAppHealth(),
     checkSubscriptionHealth(),
     checkDatabaseHealth()
   ]);
-
   console.log('✅ Health checks completed');
 }
 
@@ -389,7 +409,7 @@ export function isHealthMonitoringActive(): boolean {
 // Auto-start monitoring in production
 // =====================================================
 
-if (typeof globalThis.window !== 'undefined') {
+if (globalThis.window !== undefined) {
   // Only start monitoring if user is admin
   (async () => {
     const { data: { session } } = await supabase.auth.getSession();

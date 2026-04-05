@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { AlertTriangle, CheckCircle, XCircle, Clock, RefreshCw, X, Info, Activity } from 'lucide-react';
 import { getActiveIncidents, resolveIncident, getHealthSummary, checkSystemHealth, runHealthChecks } from '../../lib/healthMonitor';
 import { SystemIncident, HealthSummary } from '../../lib/healthMonitor';
+import { Trash2, Trash, Loader2 } from 'lucide-react';
 
 const HealthMonitorSection: React.FC = () => {
   const [incidents, setIncidents] = useState<SystemIncident[]>([]);
@@ -15,6 +16,8 @@ const HealthMonitorSection: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [actionLoading, setActionLoading] = useState<number | null>(null);
 
   useEffect(() => {
     loadData();
@@ -25,11 +28,18 @@ const HealthMonitorSection: React.FC = () => {
 
   const loadData = async () => {
     setLoading(true);
-    const [incidentsData, summaryData] = await Promise.all([
-      getActiveIncidents(50),
+    const [summaryData] = await Promise.all([
       getHealthSummary()
     ]);
-    setIncidents(incidentsData);
+    
+    // Fetch all incidents directly not just active
+    const { data: incidentsData } = await supabase
+        .from('system_incidents')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
+        
+    setIncidents(incidentsData as SystemIncident[] || []);
     setSummary(summaryData);
     setLoading(false);
   };
@@ -42,17 +52,43 @@ const HealthMonitorSection: React.FC = () => {
   };
 
   const handleResolve = async (incidentId: number) => {
-    if (!confirm('هل أنت متأكد من حل هذه المشكلة؟')) return;
-
+    setActionLoading(incidentId);
     const success = await resolveIncident(incidentId);
     if (success) {
-      setIncidents(incidents.filter(i => i.id !== incidentId));
+      setIncidents(incidents.map(i => i.id === incidentId ? { ...i, resolved: true } : i));
       if (summary) {
         setSummary({
           ...summary,
-          total_incidents: summary.total_incidents - 1
+          total_incidents: Math.max(0, summary.total_incidents - 1)
         });
       }
+    }
+    setActionLoading(null);
+  };
+
+  const handleDeleteIncident = async (id: number) => {
+    if (!globalThis.confirm('حذف هذا السجل نهائياً؟')) return;
+    try {
+        setActionLoading(id);
+        await supabase.from('system_incidents').delete().eq('id', id);
+        setIncidents(prev => prev.filter(i => i.id !== id));
+    } catch (err) {
+        console.error(err);
+    } finally {
+        setActionLoading(null);
+    }
+  };
+
+  const handleDeleteAllIncidents = async () => {
+    if (!globalThis.confirm(`حذف جميع السجلات (${incidents.length}) نهائياً؟ لا يمكن التراجع.`)) return;
+    try {
+        setDeletingAll(true);
+        await supabase.from('system_incidents').delete().neq('id', 0);
+        setIncidents([]);
+    } catch (err) {
+        console.error(err);
+    } finally {
+        setDeletingAll(false);
     }
   };
 
@@ -116,14 +152,26 @@ const HealthMonitorSection: React.FC = () => {
             <p className="text-slate-400 text-xs mt-1">مراقبة تلقائية للمشاكل والأخطاء</p>
           </div>
         </div>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 transition disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          تحديث الآن
-        </button>
+        <div className="flex items-center gap-2">
+          {incidents.length > 0 && (
+            <button
+                onClick={handleDeleteAllIncidents}
+                disabled={deletingAll || loading}
+                className="bg-red-600/10 hover:bg-red-600/20 text-red-500 px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 transition disabled:opacity-50"
+            >
+                {deletingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                حذف الكل ({incidents.length})
+            </button>
+          )}
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 transition disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            تحديث
+          </button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -229,13 +277,26 @@ const HealthMonitorSection: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleResolve(incident.id)}
-                  className="shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition"
-                >
-                  <CheckCircle className="w-3 h-3" />
-                  حل
-                </button>
+                <div className="shrink-0 flex gap-2">
+                  {!incident.resolved && (
+                      <button
+                        onClick={() => handleResolve(incident.id)}
+                        disabled={actionLoading === incident.id}
+                        className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition"
+                      >
+                        {actionLoading === incident.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                        حل
+                      </button>
+                  )}
+                  <button
+                    onClick={() => handleDeleteIncident(incident.id)}
+                    disabled={actionLoading === incident.id}
+                    className="bg-red-500/10 hover:bg-red-500/20 text-red-400 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition"
+                  >
+                    {actionLoading === incident.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash className="w-3 h-3" />}
+                    حذف
+                  </button>
+                </div>
               </div>
             </div>
           ))}
