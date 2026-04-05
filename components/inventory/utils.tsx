@@ -73,10 +73,21 @@ export const getCategorySummaries = (
 };
 
 export const getArabicDayName = (dateStr: string): string => {
-    const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const date = new Date(year, month - 1, day);
-    return days[date.getDay()];
+    if (!dateStr) return '';
+    try {
+        const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+        // Handle YYYY-MM-DD or full ISO strings
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) {
+            // Fallback for manual parsing if new Date fails some formats
+            const [year, month, day] = dateStr.split('T')[0].split('-').map(Number);
+            const fallbackDate = new Date(year, month - 1, day);
+            return days[fallbackDate.getDay()];
+        }
+        return days[date.getDay()];
+    } catch (e) {
+        return '';
+    }
 };
 
 export const getArabicMonthName = (index: number) => {
