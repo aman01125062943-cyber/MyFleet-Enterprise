@@ -51,7 +51,7 @@ const ReportDetailedView: React.FC<ReportDetailedViewProps> = ({
                             <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition group print:text-black">
                                 <td className="p-4 text-slate-600 dark:text-slate-300 whitespace-nowrap print:text-black">
                                     <div className="font-mono text-sm">{t.date}</div>
-                                    <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">{t.date ? getArabicDayName(t.date) : ''}</div>
+                                    <div className="text-[10px] font-bold text-blue-500 dark:text-blue-400 mt-0.5">{t.date ? getArabicDayName(t.date) : ''}</div>
                                 </td>
                                 <td className="p-4">
                                     <span className={`px-2 py-1 rounded text-xs font-bold inline-flex items-center gap-1 ${t.type === 'income' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20' : 'bg-red-50 text-red-600 dark:bg-red-900/20'} print:bg-transparent print:text-black print:border print:border-slate-400`}>

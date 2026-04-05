@@ -3,6 +3,7 @@ import {
     X, TrendingUp, TrendingDown, Edit, ChevronDown, Loader2 
 } from 'lucide-react';
 import { Car, Transaction, ExpenseTemplate, TransactionCategories } from '../../types';
+import { getArabicDayName } from './utils';
 
 interface AddEditTransactionModalProps {
     isOpen: boolean;
@@ -109,6 +110,11 @@ const AddEditTransactionModal: React.FC<AddEditTransactionModalProps> = ({
                                 value={tx.date || ''} 
                                 onChange={e => onTxChange({ date: e.target.value })} 
                             />
+                            {tx.date && (
+                                <div className="text-[10px] font-bold text-blue-500 mt-1 mr-1">
+                                    {getArabicDayName(tx.date)}
+                                </div>
+                            )}
                         </div>
                     </div>
 

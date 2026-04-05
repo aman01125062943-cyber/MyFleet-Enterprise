@@ -1,5 +1,6 @@
 import React from 'react';
 import { Trash2 } from 'lucide-react';
+import { getArabicDayName } from './utils';
 import ReportSummaryView from './ReportSummaryView';
 import ReportDetailedView from './ReportDetailedView';
 import { Transaction } from '../../types';
@@ -70,7 +71,10 @@ const ReportViewContent: React.FC<ReportViewContentProps> = ({
                                 <tbody className="divide-y divide-orange-100 dark:divide-orange-900/20">
                                     {trashTxs.map(t => (
                                         <tr key={t.id} className="hover:bg-orange-100/30 transition text-orange-900 dark:text-orange-200">
-                                            <td className="p-4 font-mono whitespace-nowrap opacity-60">{t.date}</td>
+                                            <td className="p-4 font-mono whitespace-nowrap opacity-60">
+                                                {t.date}
+                                                {t.date && <div className="text-[10px] font-bold text-slate-500">{getArabicDayName(t.date)}</div>}
+                                            </td>
                                             <td className="p-4">
                                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${t.type === 'income' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                                                     {t.type === 'income' ? 'وارد' : 'منصرف'}

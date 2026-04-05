@@ -9,6 +9,7 @@ import {
     Activity, Calendar, AlertTriangle, BarChart3, Crown,
     History, TrendingUp, TrendingDown
 } from 'lucide-react';
+import { getArabicDayName } from './inventory/utils';
 import WelcomeModal from './WelcomeModal';
 
 // Helper Component for Stats Card
@@ -297,7 +298,8 @@ const Dashboard: React.FC = () => {
                                 stats.recentTx.map((t) => (
                                     <tr key={t.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-700/50 transition-colors group">
                                         <td className="px-4 py-3 text-xs md:text-sm text-slate-600 dark:text-slate-400">
-                                            {new Date(t.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}
+                                            <div>{new Date(t.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}</div>
+                                            <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-0.5">{getArabicDayName(t.date)}</div>
                                         </td>
                                         <td className="px-4 py-3">
                                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
