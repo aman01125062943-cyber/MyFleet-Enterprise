@@ -71,13 +71,33 @@ services:
       - "5432"
     volumes:
       - myfleet_postgres_data:/var/lib/postgresql/data
-      - ./db/00-local-supabase-base.sh:/docker-entrypoint-initdb.d/00-local-supabase-base.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 10
     restart: unless-stopped
+    networks:
+      - myfleet_private
+
+  myfleet_supabase_init:
+    image: postgres:16-alpine
+    container_name: myfleet_enterprise_supabase_init
+    env_file:
+      - .env
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGHOST: myfleet_postgres
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB}
+      PGUSER: postgres
+    volumes:
+      - ./db/00-local-supabase-base.sh:/deploy-db/00-local-supabase-base.sh:ro
+    depends_on:
+      myfleet_postgres:
+        condition: service_healthy
+    command: ["sh", "/deploy-db/00-local-supabase-base.sh"]
+    restart: "no"
     networks:
       - myfleet_private
 
@@ -101,6 +121,8 @@ services:
     depends_on:
       myfleet_postgres:
         condition: service_healthy
+      myfleet_supabase_init:
+        condition: service_completed_successfully
       myfleet_auth:
         condition: service_started
     command: ["sh", "/run-migrations.sh"]
@@ -159,38 +181,41 @@ services:
     expose:
       - "9999"
     depends_on:
-      myfleet_postgres:
-        condition: service_healthy
+      myfleet_supabase_init:
+        condition: service_completed_successfully
     restart: unless-stopped
     networks:
       - myfleet_private
 
   myfleet_realtime:
     image: supabase/realtime:v2.34.47
-    container_name: myfleet_enterprise_realtime
+    container_name: myfleet-enterprise.supabase-realtime
     env_file:
       - .env
     environment:
       PORT: 4000
       DB_HOST: myfleet_postgres
       DB_PORT: 5432
-      DB_USER: postgres
+      DB_USER: supabase_admin
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
-      DB_AFTER_CONNECT_QUERY: "SET search_path TO _realtime,public"
+      DB_AFTER_CONNECT_QUERY: "SET search_path TO _realtime"
       DB_ENC_KEY: ${REALTIME_DB_ENC_KEY}
       API_JWT_SECRET: ${JWT_SECRET}
+      METRICS_JWT_SECRET: ${JWT_SECRET}
       SECRET_KEY_BASE: ${SECRET_KEY_BASE}
       ERL_AFLAGS: -proto_dist inet_tcp
       DNS_NODES: "''"
       RLIMIT_NOFILE: "10000"
       APP_NAME: realtime
       SEED_SELF_HOST: "true"
+      RUN_JANITOR: "true"
+      DISABLE_HEALTHCHECK_LOGGING: "true"
     expose:
       - "4000"
     depends_on:
-      myfleet_postgres:
-        condition: service_healthy
+      myfleet_supabase_init:
+        condition: service_completed_successfully
     restart: unless-stopped
     networks:
       - myfleet_private
