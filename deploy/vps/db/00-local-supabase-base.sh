@@ -88,27 +88,6 @@ AS $$
   SELECT nullif(current_setting('request.jwt.claim.email', true), '')::text;
 $$;
 
-CREATE OR REPLACE FUNCTION storage.foldername(name text)
-RETURNS text[]
-LANGUAGE sql IMMUTABLE
-AS $$
-  SELECT string_to_array(name, '/');
-$$;
-
-CREATE OR REPLACE FUNCTION storage.filename(name text)
-RETURNS text
-LANGUAGE sql IMMUTABLE
-AS $$
-  SELECT reverse(split_part(reverse(name), '/', 1));
-$$;
-
-CREATE OR REPLACE FUNCTION storage.prefix_id(name text, level int)
-RETURNS text
-LANGUAGE sql IMMUTABLE
-AS $$
-  SELECT (storage.foldername(name))[level + 1];
-$$;
-
 CREATE TABLE IF NOT EXISTS storage.buckets (
   id text PRIMARY KEY,
   name text NOT NULL UNIQUE,

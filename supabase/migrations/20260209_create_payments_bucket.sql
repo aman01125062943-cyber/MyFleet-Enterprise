@@ -33,13 +33,13 @@ WITH CHECK (bucket_id = 'payments');
 CREATE POLICY "Users can update their own payments"
 ON storage.objects FOR UPDATE
 TO authenticated
-USING (bucket_id = 'payments' AND auth.uid()::text = (storage.foldername(name))[0]);
+USING (bucket_id = 'payments' AND auth.uid()::text = (string_to_array(name, '/'))[1]);
 
 -- السماح بالحذف للمالك فقط
 CREATE POLICY "Users can delete their own payments"
 ON storage.objects FOR DELETE
 TO authenticated
-USING (bucket_id = 'payments' AND auth.uid()::text = (storage.foldername(name))[0]);
+USING (bucket_id = 'payments' AND auth.uid()::text = (string_to_array(name, '/'))[1]);
 
 -- منع الحذف بعد الموافقة على الطلب
 CREATE POLICY "Prevent deletion of approved payment receipts"
@@ -49,7 +49,7 @@ USING (
   bucket_id = 'payments' AND
   NOT EXISTS (
     SELECT 1 FROM payment_requests
-    WHERE receipt_url = storage.prefix_id(name, 0)
+    WHERE receipt_url = (string_to_array(name, '/'))[1]
     AND status IN ('approved', 'paid')
   )
 );
