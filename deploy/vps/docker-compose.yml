@@ -1,0 +1,61 @@
+services:
+  myfleet_app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+    container_name: myfleet_enterprise_app
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-3002}
+      FRONTEND_URL: ${FRONTEND_URL}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@myfleet_postgres:5432/${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:${APP_HOST_PORT:-3012}:3002"
+    volumes:
+      - myfleet_whatsapp_sessions:/app/whatsapp-service/auth_sessions
+    depends_on:
+      myfleet_postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - myfleet_private
+
+  myfleet_postgres:
+    image: postgres:16-alpine
+    container_name: myfleet_enterprise_postgres
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    expose:
+      - "5432"
+    volumes:
+      - myfleet_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - myfleet_private
+
+networks:
+  myfleet_private:
+    name: myfleet_enterprise_private
+    driver: bridge
+
+volumes:
+  myfleet_postgres_data:
+    name: myfleet_enterprise_postgres_data
+  myfleet_whatsapp_sessions:
+    name: myfleet_enterprise_whatsapp_sessions

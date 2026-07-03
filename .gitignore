@@ -23,6 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 .env
+deploy/vps/.env
 
 # WhatsApp Service
 whatsapp-service/auth_sessions/
