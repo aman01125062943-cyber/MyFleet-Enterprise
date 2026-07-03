@@ -401,10 +401,14 @@ BEGIN
         UPDATE whatsapp_notification_logs
         SET status = 'failed',
             error_message = p_error
-        WHERE notification_type = (SELECT notification_type FROM whatsapp_notification_queue WHERE id = v_notification_id)
-        AND phone_number = (SELECT phone_number FROM whatsapp_notification_queue WHERE id = v_notification_id)
-        AND created_at > NOW() - INTERVAL '1 hour'
-        LIMIT 1;
+        WHERE ctid IN (
+            SELECT ctid
+            FROM whatsapp_notification_logs
+            WHERE notification_type = (SELECT notification_type FROM whatsapp_notification_queue WHERE id = v_notification_id)
+            AND phone_number = (SELECT phone_number FROM whatsapp_notification_queue WHERE id = v_notification_id)
+            AND created_at > NOW() - INTERVAL '1 hour'
+            LIMIT 1
+        );
 
         RETURN jsonb_build_object(
             'success', true,
