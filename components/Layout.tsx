@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabaseClient';
 import {
   Car, Home, Users, Settings, LogOut,
   ShieldCheck, Calculator, Crown, Sun, Moon, AlertTriangle, Lock, ArrowRight,
-  Wifi, WifiOff, Database, ChevronLeft, Menu, DollarSign, Wrench, Trash2
+  Wifi, WifiOff, Database, ChevronLeft, Menu, DollarSign, Wrench, Trash2, Download
 } from 'lucide-react';
 import { seedLocalDB, syncData } from '../lib/syncManager';
 import { Profile, Organization, UserPermissions, SystemConfig } from '../types';
@@ -271,6 +271,7 @@ const Layout: React.FC = () => {
     { id: 'team', label: 'فريق العمل', icon: Users, path: '/team', show: can('team') },
     { id: 'assets', label: 'الأصول', icon: Database, path: '/assets', show: can('assets') },
     { id: 'trash', label: 'سلة المهملات', icon: Trash2, path: '/trash', show: can('inventory', 'delete') },
+    { id: 'backup', label: 'النسخ الاحتياطي', icon: Download, path: '/backup', show: Boolean(userProfile?.org_id) },
     { id: 'subscription', label: 'ترقية الباقة', icon: Crown, path: '/subscription', show: true },
     { id: 'settings', label: 'الإعدادات', icon: Settings, path: '/settings', show: true },
     { id: 'super_admin', label: 'لوحة الإدارة الشاملة', icon: Crown, path: '/admin', show: userProfile?.role === 'super_admin' },
