@@ -21,21 +21,33 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          VPS_PORT="${{ secrets.MYFLEET_VPS_PORT }}"
+          if [ -z "$VPS_PORT" ]; then
+            VPS_PORT="22"
+          fi
+          if [ -z "${{ secrets.MYFLEET_VPS_HOST }}" ] || [ -z "${{ secrets.MYFLEET_VPS_USER }}" ] || [ -z "${{ secrets.MYFLEET_VPS_SSH_KEY }}" ]; then
+            echo "Missing one or more required secrets: MYFLEET_VPS_HOST, MYFLEET_VPS_USER, MYFLEET_VPS_SSH_KEY"
+            exit 1
+          fi
           mkdir -p ~/.ssh
           printf '%s\n' "${{ secrets.MYFLEET_VPS_SSH_KEY }}" > ~/.ssh/myfleet_vps_key
           chmod 600 ~/.ssh/myfleet_vps_key
-          ssh-keyscan -p "${{ secrets.MYFLEET_VPS_PORT }}" "${{ secrets.MYFLEET_VPS_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -p "$VPS_PORT" "${{ secrets.MYFLEET_VPS_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Sync files to isolated VPS path
         shell: bash
         run: |
           set -euo pipefail
+          VPS_PORT="${{ secrets.MYFLEET_VPS_PORT }}"
+          if [ -z "$VPS_PORT" ]; then
+            VPS_PORT="22"
+          fi
           VPS_PATH="${{ secrets.MYFLEET_VPS_PATH }}"
           if [ -z "$VPS_PATH" ]; then
             VPS_PATH="/opt/myfleet-enterprise"
           fi
 
-          ssh -i ~/.ssh/myfleet_vps_key -p "${{ secrets.MYFLEET_VPS_PORT }}" "${{ secrets.MYFLEET_VPS_USER }}@${{ secrets.MYFLEET_VPS_HOST }}" "mkdir -p '$VPS_PATH'"
+          ssh -i ~/.ssh/myfleet_vps_key -p "$VPS_PORT" "${{ secrets.MYFLEET_VPS_USER }}@${{ secrets.MYFLEET_VPS_HOST }}" "mkdir -p '$VPS_PATH'"
 
           rsync -az --delete \
             --exclude '.git' \
@@ -46,19 +58,23 @@ jobs:
             --exclude 'auth_sessions' \
             --exclude 'whatsapp-service/auth_sessions' \
             --exclude 'deploy/vps/.env' \
-            -e "ssh -i ~/.ssh/myfleet_vps_key -p ${{ secrets.MYFLEET_VPS_PORT }}" \
+            -e "ssh -i ~/.ssh/myfleet_vps_key -p $VPS_PORT" \
             ./ "${{ secrets.MYFLEET_VPS_USER }}@${{ secrets.MYFLEET_VPS_HOST }}:$VPS_PATH/"
 
       - name: Build and restart isolated stack
         shell: bash
         run: |
           set -euo pipefail
+          VPS_PORT="${{ secrets.MYFLEET_VPS_PORT }}"
+          if [ -z "$VPS_PORT" ]; then
+            VPS_PORT="22"
+          fi
           VPS_PATH="${{ secrets.MYFLEET_VPS_PATH }}"
           if [ -z "$VPS_PATH" ]; then
             VPS_PATH="/opt/myfleet-enterprise"
           fi
 
-          ssh -i ~/.ssh/myfleet_vps_key -p "${{ secrets.MYFLEET_VPS_PORT }}" "${{ secrets.MYFLEET_VPS_USER }}@${{ secrets.MYFLEET_VPS_HOST }}" "set -e
+          ssh -i ~/.ssh/myfleet_vps_key -p "$VPS_PORT" "${{ secrets.MYFLEET_VPS_USER }}@${{ secrets.MYFLEET_VPS_HOST }}" "set -e
             cd '$VPS_PATH'
             test -f deploy/vps/.env || cp deploy/vps/.env.example deploy/vps/.env
             docker compose -p myfleet_enterprise --env-file deploy/vps/.env -f deploy/vps/docker-compose.yml up -d --build --remove-orphans
