@@ -5,8 +5,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install git needed for some dependencies
-RUN apk add --no-cache git
+# Install git and build tools needed for native dependencies during npm install
+RUN apk add --no-cache git python3 make g++
 
 # Install dependencies for both root and whatsapp-service
 COPY package*.json ./
