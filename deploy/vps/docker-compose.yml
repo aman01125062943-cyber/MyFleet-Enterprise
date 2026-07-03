@@ -151,7 +151,7 @@ services:
       - myfleet_private
 
   myfleet_auth:
-    image: supabase/gotrue:v2.177.0
+    image: supabase/gotrue:v2.189.0
     container_name: myfleet_enterprise_auth
     env_file:
       - .env

@@ -198,16 +198,6 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.register_device_session(p_device_id text, p_device_info text DEFAULT NULL)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  RETURN;
-END;
-$$;
-
 INSERT INTO public.public_config (id, show_landing_page, show_pricing_page, allow_registration, allow_trial_accounts, default_entry_page, available_plans)
 VALUES (1, true, true, true, true, 'landing', '[]'::jsonb)
 ON CONFLICT (id) DO NOTHING;
