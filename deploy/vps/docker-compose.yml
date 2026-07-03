@@ -6,7 +6,7 @@ services:
       - .env
     environment:
       KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/kong.yml
       KONG_DNS_ORDER: LAST,A,CNAME
       KONG_PLUGINS: request-transformer,cors,key-auth,acl
       KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
@@ -16,7 +16,9 @@ services:
     ports:
       - "0.0.0.0:${SUPABASE_API_PORT:-3013}:8000"
     volumes:
-      - ./supabase/kong.yml:/home/kong/kong.yml:ro
+      - ./supabase/kong.yml:/home/kong/temp.yml:ro
+      - ./supabase/kong-entrypoint.sh:/home/kong/kong-entrypoint.sh:ro
+    entrypoint: ["sh", "/home/kong/kong-entrypoint.sh"]
     depends_on:
       myfleet_auth:
         condition: service_started
