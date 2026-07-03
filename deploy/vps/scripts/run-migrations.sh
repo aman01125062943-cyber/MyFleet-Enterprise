@@ -8,7 +8,7 @@ run_sql() {
 }
 
 psql -v ON_ERROR_STOP=1 <<'SQL'
-CREATE TABLE IF NOT EXISTS public.schema_migrations (
+CREATE TABLE IF NOT EXISTS public.myfleet_schema_migrations (
   filename text PRIMARY KEY,
   applied_at timestamptz NOT NULL DEFAULT now()
 );
@@ -28,13 +28,13 @@ done
 run_once() {
   file="$1"
   name="$(basename "$file")"
-  already="$(psql -At -c "SELECT 1 FROM public.schema_migrations WHERE filename = '$name' LIMIT 1")"
+  already="$(psql -At -c "SELECT 1 FROM public.myfleet_schema_migrations WHERE filename = '$name' LIMIT 1")"
   if [ "$already" = "1" ]; then
     echo "Skipping $name"
     return
   fi
   run_sql "$file"
-  psql -v ON_ERROR_STOP=1 -c "INSERT INTO public.schema_migrations(filename) VALUES ('$name') ON CONFLICT DO NOTHING"
+  psql -v ON_ERROR_STOP=1 -c "INSERT INTO public.myfleet_schema_migrations(filename) VALUES ('$name') ON CONFLICT DO NOTHING"
 }
 
 run_once /deploy-db/10-myfleet-core.sql

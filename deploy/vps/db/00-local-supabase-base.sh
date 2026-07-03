@@ -49,9 +49,20 @@ CREATE SCHEMA IF NOT EXISTS realtime AUTHORIZATION supabase_admin;
 CREATE SCHEMA IF NOT EXISTS _realtime AUTHORIZATION supabase_admin;
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT USAGE, CREATE ON SCHEMA public TO supabase_auth_admin;
+GRANT USAGE, CREATE ON SCHEMA public TO supabase_storage_admin;
+GRANT USAGE, CREATE ON SCHEMA public TO supabase_admin;
 GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role, supabase_auth_admin;
 GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role, supabase_storage_admin;
 GRANT USAGE ON SCHEMA realtime TO anon, authenticated, service_role, supabase_admin;
+GRANT USAGE, CREATE ON SCHEMA auth TO supabase_auth_admin;
+GRANT USAGE, CREATE ON SCHEMA storage TO supabase_storage_admin;
+GRANT USAGE, CREATE ON SCHEMA realtime TO supabase_admin;
+GRANT USAGE, CREATE ON SCHEMA _realtime TO supabase_admin;
+
+ALTER ROLE supabase_auth_admin SET search_path = auth, public;
+ALTER ROLE supabase_storage_admin SET search_path = storage, public;
+ALTER ROLE supabase_admin SET search_path = _realtime, public;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO anon, authenticated, service_role;
