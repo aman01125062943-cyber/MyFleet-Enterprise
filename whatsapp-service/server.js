@@ -22,21 +22,24 @@ const PORT = process.env.PORT || 3002;
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-    console.error('❌ Missing Supabase configuration');
-    process.exit(1);
+const hasSupabaseServiceConfig = Boolean(supabaseUrl && supabaseKey);
+
+if (!hasSupabaseServiceConfig) {
+    console.warn('⚠️ Missing Supabase service configuration. Static app will run, WhatsApp APIs are disabled.');
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = hasSupabaseServiceConfig ? createClient(supabaseUrl, supabaseKey) : null;
 
-// Initialize services
-const sessionManager = new SessionManager(supabase);
-const messageService = new MessageService(sessionManager, supabase);
-const notificationService = new NotificationService(supabaseUrl, supabaseKey, sessionManager);
-const notificationScheduler = new NotificationScheduler(notificationService, supabaseUrl, supabaseKey);
+// Initialize services only when Render has the private service key configured.
+const sessionManager = supabase ? new SessionManager(supabase) : null;
+const messageService = supabase ? new MessageService(sessionManager, supabase) : null;
+const notificationService = supabase ? new NotificationService(supabaseUrl, supabaseKey, sessionManager) : null;
+const notificationScheduler = notificationService ? new NotificationScheduler(notificationService, supabaseUrl, supabaseKey) : null;
 
 // Start Scheduler
-notificationScheduler.init();
+if (notificationScheduler) {
+    notificationScheduler.init();
+}
 
 // Middleware
 const allowedOrigins = new Set([
@@ -1229,9 +1232,13 @@ app.use((err, req, res, next) => {
 app.listen(PORT, async () => {
     console.log(`🚀 WhatsApp Microservice running on port ${PORT}`);
 
+    if (!sessionManager) {
+        console.warn('⚠️ WhatsApp session restore skipped because Supabase service config is missing.');
+        return;
+    }
+
     // Restore existing sessions
     await sessionManager.restoreAllSessions();
-
     console.log(`📱 Ready to handle WhatsApp connections`);
 });
 
@@ -1239,10 +1246,12 @@ app.listen(PORT, async () => {
 process.on('SIGTERM', async () => {
     console.log('🛑 Received SIGTERM, shutting down gracefully...');
 
-    // Disconnect all sessions
-    const sessions = sessionManager.getAllSessions();
-    for (const session of sessions) {
-        await sessionManager.disconnectSession(session.sessionId);
+    if (sessionManager) {
+        // Disconnect all sessions
+        const sessions = sessionManager.getAllSessions();
+        for (const session of sessions) {
+            await sessionManager.disconnectSession(session.sessionId);
+        }
     }
 
     process.exit(0);
@@ -1251,9 +1260,11 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
     console.log('🛑 Received SIGINT, shutting down gracefully...');
 
-    const sessions = sessionManager.getAllSessions();
-    for (const session of sessions) {
-        await sessionManager.disconnectSession(session.sessionId);
+    if (sessionManager) {
+        const sessions = sessionManager.getAllSessions();
+        for (const session of sessions) {
+            await sessionManager.disconnectSession(session.sessionId);
+        }
     }
 
     process.exit(0);
