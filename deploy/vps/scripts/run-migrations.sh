@@ -33,6 +33,12 @@ run_once() {
     echo "Skipping $name"
     return
   fi
+  if grep -q "CREATE OR REPLACE FUNCTION complete_signup" "$file"; then
+    psql -v ON_ERROR_STOP=1 <<'SQL'
+DROP FUNCTION IF EXISTS public.complete_signup(text, text, text);
+DROP FUNCTION IF EXISTS public.complete_signup(text, text);
+SQL
+  fi
   run_sql "$file"
   psql -v ON_ERROR_STOP=1 -c "INSERT INTO public.myfleet_schema_migrations(filename) VALUES ('$name') ON CONFLICT DO NOTHING"
 }
