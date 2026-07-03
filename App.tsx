@@ -20,6 +20,7 @@ const TripCalculator = React.lazy(() => import('./components/TripCalculator'));
 const SuperAdminDashboard = React.lazy(() => import('./components/SuperAdminDashboard'));
 const Assets = React.lazy(() => import('./components/Assets'));
 const Financials = React.lazy(() => import('./components/Financials'));
+const BackupPage = React.lazy(() => import('./components/BackupPage'));
 const LandingPage = React.lazy(() => import('./components/LandingPage'));
 const PricingPage = React.lazy(() => import('./components/PricingPage'));
 const SubscriptionRoute = React.lazy(() => import('./components/SubscriptionRoute'));
@@ -369,6 +370,7 @@ const App: React.FC = () => {
                   <Route path="/financials" element={<Financials />} />
                   <Route path="/team" element={<Team />} />
                   <Route path="/assets" element={<Assets />} />
+                  <Route path="/backup" element={<BackupPage />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/subscription" element={<SubscriptionRoute />} />
                   <Route path="/calculator" element={<TripCalculator />} />
