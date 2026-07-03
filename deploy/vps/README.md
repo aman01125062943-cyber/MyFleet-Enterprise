@@ -1,81 +1,86 @@
-# MyFleet Enterprise VPS Deploy
+# MyFleet Enterprise Isolated VPS Deploy
 
-هذا التجهيز معزول عن أي تطبيق آخر على نفس الـ VPS.
+هذا النشر مخصص لـ Hostinger VPS ويعمل بمعزل كامل عن أي تطبيق آخر على نفس السيرفر.
 
-الأسماء المستخدمة عمدا:
+## العزل
+
 - المسار: `/opt/myfleet-enterprise`
-- Docker compose project: `myfleet_enterprise`
-- حاوية التطبيق: `myfleet_enterprise_app`
-- حاوية قاعدة البيانات: `myfleet_enterprise_postgres`
+- Docker Compose project: `myfleet_enterprise`
+- حاويات MyFleet فقط تستخدم prefix: `myfleet_enterprise_`
 - الشبكة: `myfleet_enterprise_private`
-- Volumes: `myfleet_enterprise_postgres_data`, `myfleet_enterprise_whatsapp_sessions`
-- منفذ التطبيق المحلي على السيرفر: `127.0.0.1:3012`
+- Volumes:
+  - `myfleet_enterprise_postgres_data`
+  - `myfleet_enterprise_storage_data`
+  - `myfleet_enterprise_whatsapp_sessions`
+- لا يتم لمس `/opt/togar-alkhotot`
+- لا يتم لمس بورتات `80/443`
+- لا يتم تعديل Caddy أو أي reverse proxy عام
 
-## مهم
+## المنافذ المؤقتة
 
-التطبيق الحالي ما زال يستخدم Supabase في الواجهة والخدمة الخلفية لتسجيل الدخول والصلاحيات والبيانات. لذلك ملف النشر يجهز قاعدة PostgreSQL محلية منفصلة على الـ VPS، لكن تشغيل النظام بالكامل على قاعدة محلية فقط يحتاج مرحلة نقل من Supabase أو تشغيل Supabase self-hosted كامل.
+- التطبيق: `http://VPS_IP:3012`
+- Supabase المحلي: `http://VPS_IP:3013`
 
-بهذا الشكل لا يتم لمس تطبيقات أخرى، ولا يتم استخدام قاعدة بيانات أي تطبيق آخر.
+## ملف البيئة على السيرفر
 
-## أول تشغيل على الـ VPS
-
-1. أنشئ المسار:
-
-```bash
-mkdir -p /opt/myfleet-enterprise
-```
-
-2. ارفع المشروع أو اترك GitHub Actions يرفعه.
-
-3. أنشئ ملف البيئة من المثال:
+أنشئ الملف الحقيقي على الـ VPS فقط:
 
 ```bash
-cp /opt/myfleet-enterprise/deploy/vps/.env.example /opt/myfleet-enterprise/deploy/vps/.env
-nano /opt/myfleet-enterprise/deploy/vps/.env
+cd /opt/myfleet-enterprise
+cp deploy/vps/.env.example deploy/vps/.env
+nano deploy/vps/.env
 ```
 
-4. ضع القيم الحقيقية في `.env` على السيرفر فقط.
+يجب تغيير القيم التالية على الأقل:
 
-5. شغل الحزمة:
+- `VPS_PUBLIC_HOST`
+- `FRONTEND_URL`
+- `VITE_SUPABASE_URL`
+- `JWT_SECRET`
+- `ANON_KEY`
+- `SERVICE_ROLE_KEY`
+- `SECRET_KEY_BASE`
+- `REALTIME_DB_ENC_KEY`
+- `POSTGRES_PASSWORD`
+
+`ANON_KEY` و `SERVICE_ROLE_KEY` يجب أن يكونا JWT موقّعين بنفس `JWT_SECRET`.
+
+## التشغيل اليدوي
 
 ```bash
 cd /opt/myfleet-enterprise
 docker compose -p myfleet_enterprise --env-file deploy/vps/.env -f deploy/vps/docker-compose.yml up -d --build --remove-orphans
+docker compose -p myfleet_enterprise -f deploy/vps/docker-compose.yml ps
 ```
 
-6. افحص الحالة:
+## الفحص
 
 ```bash
-docker compose -p myfleet_enterprise -f deploy/vps/docker-compose.yml ps
 curl -I http://127.0.0.1:3012/
+curl -I http://127.0.0.1:3013/rest/v1/
+docker compose -p myfleet_enterprise -f deploy/vps/docker-compose.yml logs --tail=100
 ```
 
-## ربط الدومين
+## النشر التلقائي من GitHub
 
-لا تعدل إعدادات أي تطبيق آخر. اربط الدومين أو الـ subdomain الخاص بـ MyFleet فقط إلى `http://127.0.0.1:3012`.
-
-لو عندك Caddy عام على السيرفر، أضف بلوك منفصل فقط:
-
-```caddyfile
-myfleet.example.com {
-  reverse_proxy 127.0.0.1:3012
-}
-```
-
-## GitHub Secrets المطلوبة
-
-ضع هذه القيم في GitHub repository secrets:
+أضف GitHub repository secrets:
 
 - `MYFLEET_VPS_HOST`
 - `MYFLEET_VPS_USER`
-- `MYFLEET_VPS_PORT`
+- `MYFLEET_VPS_PORT` اختياري، الافتراضي `22`
 - `MYFLEET_VPS_SSH_KEY`
-- `MYFLEET_VPS_PATH`
+- `MYFLEET_VPS_PATH` اختياري، الافتراضي `/opt/myfleet-enterprise`
 
-القيمة المقترحة لـ `MYFLEET_VPS_PATH`:
+بعد أي push على `main`:
 
-```text
-/opt/myfleet-enterprise
-```
+- يتم رفع ملفات MyFleet إلى `/opt/myfleet-enterprise`
+- يتم تشغيل project `myfleet_enterprise` فقط
+- لا يوجد `docker system prune`
+- لا يتم إيقاف أو حذف حاويات أي تطبيق آخر
+- إذا كان `deploy/vps/.env` غير موجود على الـ VPS سيفشل النشر برسالة واضحة
 
-بعدها أي Push على `main` يشغل النشر التلقائي.
+## ملاحظات قاعدة البيانات
+
+هذا التجهيز يشغل Supabase self-hosted محلياً على نفس الـ VPS، وليس Supabase السحابي. جداول MyFleet الأساسية تُنشأ عبر `deploy/vps/db/10-myfleet-core.sql`، ثم تُطبق migrations الموجودة في `supabase/migrations`.
+
+نقل بيانات Supabase السحابي القديم إلى القاعدة المحلية مرحلة منفصلة بعد التأكد أن النشر المحلي يعمل.

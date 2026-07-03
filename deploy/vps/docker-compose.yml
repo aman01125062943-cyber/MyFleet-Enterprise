@@ -1,11 +1,40 @@
 services:
+  myfleet_kong:
+    image: kong:2.8.1
+    container_name: myfleet_enterprise_kong
+    env_file:
+      - .env
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+    ports:
+      - "0.0.0.0:${SUPABASE_API_PORT:-3013}:8000"
+    volumes:
+      - ./supabase/kong.yml:/home/kong/kong.yml:ro
+    depends_on:
+      myfleet_auth:
+        condition: service_started
+      myfleet_rest:
+        condition: service_started
+      myfleet_storage:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - myfleet_private
+
   myfleet_app:
     build:
       context: ../..
       dockerfile: Dockerfile
       args:
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
-        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_SUPABASE_ANON_KEY: ${ANON_KEY}
     container_name: myfleet_enterprise_app
     env_file:
       - .env
@@ -13,16 +42,18 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: ${PORT:-3002}
       FRONTEND_URL: ${FRONTEND_URL}
-      SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@myfleet_postgres:5432/${POSTGRES_DB}
+      SUPABASE_URL: ${VITE_SUPABASE_URL}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@myfleet_postgres:5432/${POSTGRES_DB}
     ports:
-      - "127.0.0.1:${APP_HOST_PORT:-3012}:3002"
+      - "0.0.0.0:${APP_HOST_PORT:-3012}:3002"
     volumes:
       - myfleet_whatsapp_sessions:/app/whatsapp-service/auth_sessions
     depends_on:
-      myfleet_postgres:
-        condition: service_healthy
+      myfleet_migrations:
+        condition: service_completed_successfully
+      myfleet_kong:
+        condition: service_started
     restart: unless-stopped
     networks:
       - myfleet_private
@@ -34,17 +65,163 @@ services:
       - .env
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     expose:
       - "5432"
     volumes:
       - myfleet_postgres_data:/var/lib/postgresql/data
+      - ./db/00-local-supabase-base.sh:/docker-entrypoint-initdb.d/00-local-supabase-base.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
+    networks:
+      - myfleet_private
+
+  myfleet_migrations:
+    image: postgres:16-alpine
+    container_name: myfleet_enterprise_migrations
+    env_file:
+      - .env
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGHOST: myfleet_postgres
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB}
+      PGUSER: postgres
+    volumes:
+      - ./scripts/run-migrations.sh:/run-migrations.sh:ro
+      - ./db:/deploy-db:ro
+      - ../../supabase/migrations:/app-migrations:ro
+      - ../../maintenance_scripts:/maintenance-scripts:ro
+      - ../../db_scripts_archive:/archive-scripts:ro
+    depends_on:
+      myfleet_postgres:
+        condition: service_healthy
+      myfleet_auth:
+        condition: service_started
+    command: ["sh", "/run-migrations.sh"]
+    restart: "no"
+    networks:
+      - myfleet_private
+
+  myfleet_rest:
+    image: postgrest/postgrest:v12.2.8
+    container_name: myfleet_enterprise_rest
+    env_file:
+      - .env
+    environment:
+      PGRST_DB_URI: postgresql://authenticator:${POSTGRES_PASSWORD}@myfleet_postgres:5432/${POSTGRES_DB}
+      PGRST_DB_SCHEMAS: public,storage
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+    expose:
+      - "3000"
+    depends_on:
+      myfleet_migrations:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - myfleet_private
+
+  myfleet_auth:
+    image: supabase/gotrue:v2.177.0
+    container_name: myfleet_enterprise_auth
+    env_file:
+      - .env
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${VITE_SUPABASE_URL}
+      GOTRUE_SITE_URL: ${FRONTEND_URL}
+      GOTRUE_URI_ALLOW_LIST: ${FRONTEND_URL}
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgresql://supabase_auth_admin:${POSTGRES_PASSWORD}@myfleet_postgres:5432/${POSTGRES_DB}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: ${JWT_EXPIRY:-3600}
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-admin@example.com}
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:-}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-587}
+      GOTRUE_SMTP_USER: ${SMTP_USER:-}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /auth/v1/verify
+    expose:
+      - "9999"
+    depends_on:
+      myfleet_postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - myfleet_private
+
+  myfleet_realtime:
+    image: supabase/realtime:v2.34.47
+    container_name: myfleet_enterprise_realtime
+    env_file:
+      - .env
+    environment:
+      PORT: 4000
+      DB_HOST: myfleet_postgres
+      DB_PORT: 5432
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+      DB_AFTER_CONNECT_QUERY: "SET search_path TO _realtime"
+      DB_ENC_KEY: ${REALTIME_DB_ENC_KEY}
+      API_JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      ERL_AFLAGS: -proto_dist inet_tcp
+      DNS_NODES: "''"
+      RLIMIT_NOFILE: "10000"
+      APP_NAME: realtime
+      SEED_SELF_HOST: "true"
+    expose:
+      - "4000"
+    depends_on:
+      myfleet_postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - myfleet_private
+
+  myfleet_storage:
+    image: supabase/storage-api:v1.19.3
+    container_name: myfleet_enterprise_storage
+    env_file:
+      - .env
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      POSTGREST_URL: http://myfleet_rest:3000
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgresql://supabase_storage_admin:${POSTGRES_PASSWORD}@myfleet_postgres:5432/${POSTGRES_DB}
+      FILE_SIZE_LIMIT: ${STORAGE_FILE_SIZE_LIMIT:-52428800}
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: myfleet
+      REGION: local
+      GLOBAL_S3_BUCKET: local
+      ENABLE_IMAGE_TRANSFORMATION: "false"
+    expose:
+      - "5000"
+    volumes:
+      - myfleet_storage_data:/var/lib/storage
+    depends_on:
+      myfleet_migrations:
+        condition: service_completed_successfully
+      myfleet_rest:
+        condition: service_started
     restart: unless-stopped
     networks:
       - myfleet_private
@@ -57,5 +234,7 @@ networks:
 volumes:
   myfleet_postgres_data:
     name: myfleet_enterprise_postgres_data
+  myfleet_storage_data:
+    name: myfleet_enterprise_storage_data
   myfleet_whatsapp_sessions:
     name: myfleet_enterprise_whatsapp_sessions

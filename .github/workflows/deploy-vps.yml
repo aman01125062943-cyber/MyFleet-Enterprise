@@ -76,7 +76,10 @@ jobs:
 
           ssh -i ~/.ssh/myfleet_vps_key -p "$VPS_PORT" "${{ secrets.MYFLEET_VPS_USER }}@${{ secrets.MYFLEET_VPS_HOST }}" "set -e
             cd '$VPS_PATH'
-            test -f deploy/vps/.env || cp deploy/vps/.env.example deploy/vps/.env
+            if [ ! -f deploy/vps/.env ]; then
+              echo 'Missing deploy/vps/.env on VPS. Create it from deploy/vps/.env.example with real local Supabase keys before deploying.'
+              exit 1
+            fi
             docker compose -p myfleet_enterprise --env-file deploy/vps/.env -f deploy/vps/docker-compose.yml up -d --build --remove-orphans
             docker compose -p myfleet_enterprise -f deploy/vps/docker-compose.yml ps
           "
