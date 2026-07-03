@@ -19,4 +19,4 @@ awk '{
   print result rest
 }' /home/kong/temp.yml > "$KONG_DECLARATIVE_CONFIG"
 
-exec /entrypoint.sh kong docker-start
+exec /docker-entrypoint.sh kong docker-start
