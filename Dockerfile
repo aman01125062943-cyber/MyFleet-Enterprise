@@ -6,14 +6,14 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install git and build tools needed for native dependencies during npm install
-RUN apk add --no-cache git python3 make g++
+RUN apk add --no-cache git python3 make g++ libc6-compat
 
 # Install dependencies for both root and whatsapp-service
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 COPY whatsapp-service/package*.json ./whatsapp-service/
-RUN cd whatsapp-service && npm install
+RUN cd whatsapp-service && npm ci
 
 # Copy source and prepare for build
 COPY . .
@@ -32,7 +32,7 @@ RUN echo "VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY" >> .env.production
 
 # Continue setup
 
-RUN npm run build
+RUN npx vite build
 
 # ===========================================
 # Stage 2: Production Server (Node.js)
@@ -42,7 +42,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Install git and build tools needed for native dependencies (like libsignal)
-RUN apk add --no-cache git python3 make g++
+RUN apk add --no-cache git python3 make g++ libc6-compat
 
 # Copy the built frontend from builder stage
 COPY --from=builder /app/dist ./dist
@@ -54,7 +54,7 @@ COPY whatsapp-service/ ./whatsapp-service/
 WORKDIR /app/whatsapp-service
 
 # Install production dependencies
-RUN npm install --omit=dev
+RUN npm ci --omit=dev
 
 # Expose the WhatsApp service port
 EXPOSE 3002
