@@ -477,6 +477,7 @@ const OrganizationsSection: React.FC<{ initialOrgs: Organization[]; onRefresh: (
     const [filterPlan, setFilterPlan] = useState<string>('all');
     const [filterStatus, setFilterStatus] = useState<string>('all');
     const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
+    const [previewOrg, setPreviewOrg] = useState<Organization | null>(null);
     const [selectedOrgTab, setSelectedOrgTab] = useState<DashboardTab>('info');
 
     useEffect(() => {
@@ -637,6 +638,13 @@ const OrganizationsSection: React.FC<{ initialOrgs: Organization[]; onRefresh: (
                                     <td className="px-6 py-4">
                                         <div className="flex items-center justify-center gap-2">
                                             <button
+                                                onClick={() => setPreviewOrg(org)}
+                                                className="p-2 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition"
+                                                title="معاينة صفحة الوكالة"
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                            </button>
+                                            <button
                                                 onClick={() => setSelectedOrg(org)}
                                                 className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition"
                                                 title="إدارة كاملة"
@@ -719,6 +727,9 @@ const OrganizationsSection: React.FC<{ initialOrgs: Organization[]; onRefresh: (
                         </div>
 
                         <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
+                            <button onClick={() => setPreviewOrg(org)} className="flex-1 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition">
+                                <Eye className="w-3 h-3" /> معاينة
+                            </button>
                             <button onClick={() => setSelectedOrg(org)} className="flex-1 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition">
                                 <Settings className="w-3 h-3" /> إدارة
                             </button>
@@ -771,6 +782,18 @@ const OrganizationsSection: React.FC<{ initialOrgs: Organization[]; onRefresh: (
                 </div>
             )}
 
+            {previewOrg && (
+                <OrganizationPreviewModal
+                    org={previewOrg}
+                    onClose={() => setPreviewOrg(null)}
+                    onManage={() => {
+                        setPreviewOrg(null);
+                        setSelectedOrgTab('info');
+                        setSelectedOrg(previewOrg);
+                    }}
+                />
+            )}
+
             {/* Advanced Organization Management Modal */}
             {
                 selectedOrg && (
@@ -789,6 +812,229 @@ const OrganizationsSection: React.FC<{ initialOrgs: Organization[]; onRefresh: (
                     />
                 )
             }
+        </div>
+    );
+};
+
+interface OrganizationPreviewData {
+    carsCount: number;
+    usersCount: number;
+    transactionsCount: number;
+    balance: number;
+    recentCars: Array<Record<string, unknown>>;
+    recentUsers: Array<Record<string, unknown>>;
+    recentTransactions: Array<Record<string, unknown>>;
+}
+
+const OrganizationPreviewModal: React.FC<{ org: Organization; onClose: () => void; onManage: () => void }> = ({ org, onClose, onManage }) => {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [preview, setPreview] = useState<OrganizationPreviewData>({
+        carsCount: 0,
+        usersCount: 0,
+        transactionsCount: 0,
+        balance: 0,
+        recentCars: [],
+        recentUsers: [],
+        recentTransactions: []
+    });
+
+    useEffect(() => {
+        let mounted = true;
+
+        const loadPreview = async () => {
+            setLoading(true);
+            setError('');
+
+            try {
+                const [
+                    carsCountRes,
+                    usersCountRes,
+                    transactionsCountRes,
+                    carsRes,
+                    usersRes,
+                    transactionsRes
+                ] = await Promise.all([
+                    supabase.from('cars').select('id', { count: 'exact', head: true }).eq('org_id', org.id),
+                    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('org_id', org.id),
+                    supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('org_id', org.id),
+                    supabase.from('cars').select('id, name, make, model, plate_number, status, created_at').eq('org_id', org.id).order('created_at', { ascending: false }).limit(5),
+                    supabase.from('profiles').select('id, full_name, email, role, status').eq('org_id', org.id).limit(5),
+                    supabase.from('transactions').select('id, type, amount, date, category, reason').eq('org_id', org.id).order('date', { ascending: false }).limit(8)
+                ]);
+
+                const firstError = carsCountRes.error || usersCountRes.error || transactionsCountRes.error || carsRes.error || usersRes.error || transactionsRes.error;
+                if (firstError) throw firstError;
+
+                const transactions = (transactionsRes.data || []) as Array<Record<string, unknown>>;
+                const balance = transactions.reduce((total, tx) => {
+                    const amount = typeof tx.amount === 'number' ? tx.amount : Number(tx.amount || 0);
+                    return tx.type === 'income' ? total + amount : total - amount;
+                }, 0);
+
+                if (mounted) {
+                    setPreview({
+                        carsCount: carsCountRes.count || 0,
+                        usersCount: usersCountRes.count || 0,
+                        transactionsCount: transactionsCountRes.count || 0,
+                        balance,
+                        recentCars: (carsRes.data || []) as Array<Record<string, unknown>>,
+                        recentUsers: (usersRes.data || []) as Array<Record<string, unknown>>,
+                        recentTransactions: transactions
+                    });
+                }
+            } catch (err) {
+                const message = err instanceof Error ? err.message : 'تعذر تحميل معاينة الوكالة';
+                if (mounted) setError(message);
+            } finally {
+                if (mounted) setLoading(false);
+            }
+        };
+
+        loadPreview();
+        return () => { mounted = false; };
+    }, [org.id]);
+
+    const formatDate = (date?: unknown) => {
+        if (typeof date !== 'string' || !date) return '-';
+        return new Date(date).toLocaleDateString('en-CA');
+    };
+
+    const formatMoney = (amount: number) => `${amount.toLocaleString('ar-EG')} ج.م`;
+
+    const previewStats = [
+        { label: 'السيارات', value: preview.carsCount, icon: Car, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+        { label: 'المستخدمين', value: preview.usersCount, icon: Users, color: 'text-purple-400', bg: 'bg-purple-500/10' },
+        { label: 'الحركات', value: preview.transactionsCount, icon: Receipt, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+        { label: 'صافي آخر الحركات', value: formatMoney(preview.balance), icon: DollarSign, color: preview.balance >= 0 ? 'text-emerald-400' : 'text-red-400', bg: preview.balance >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10' },
+    ];
+
+    return (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+            <div className="bg-slate-950 w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-700 shadow-2xl">
+                <div className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur border-b border-slate-800 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold text-lg">
+                            {org.name?.charAt(0) || 'و'}
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-white">معاينة وكالة: {org.name}</h3>
+                            <p className="text-xs text-slate-500 font-mono mt-1">{org.id}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button onClick={onManage} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold flex items-center gap-2 transition">
+                            <Settings className="w-4 h-4" /> إدارة
+                        </button>
+                        <button onClick={onClose} className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition" aria-label="إغلاق">
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+                </div>
+
+                <div className="p-5 space-y-5">
+                    {loading ? (
+                        <div className="flex items-center justify-center py-20 text-slate-400">
+                            <Loader2 className="w-8 h-8 animate-spin ml-3" />
+                            جاري تحميل معاينة الوكالة...
+                        </div>
+                    ) : error ? (
+                        <div className="bg-red-500/10 border border-red-500/20 text-red-300 rounded-2xl p-5 flex items-center gap-3">
+                            <AlertCircle className="w-5 h-5" />
+                            {error}
+                        </div>
+                    ) : (
+                        <>
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                {previewStats.map(stat => (
+                                    <div key={stat.label} className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+                                        <div className={`w-10 h-10 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center mb-3`}>
+                                            <stat.icon className="w-5 h-5" />
+                                        </div>
+                                        <div className="text-2xl font-bold text-white">{stat.value}</div>
+                                        <div className="text-xs text-slate-500 mt-1">{stat.label}</div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+                                    <h4 className="text-white font-bold mb-4 flex items-center gap-2">
+                                        <CreditCard className="w-5 h-5 text-orange-400" /> الاشتراك
+                                    </h4>
+                                    <div className="space-y-3 text-sm">
+                                        <div className="flex justify-between gap-4"><span className="text-slate-500">الباقة</span><span className="text-white font-bold">{org.subscription_plan || '-'}</span></div>
+                                        <div className="flex justify-between gap-4"><span className="text-slate-500">الحالة</span><span className={org.is_active === false ? 'text-red-400' : 'text-emerald-400'}>{org.is_active === false ? 'معطل' : 'نشط'}</span></div>
+                                        <div className="flex justify-between gap-4"><span className="text-slate-500">البداية</span><span className="text-slate-200 font-mono">{formatDate(org.subscription_start)}</span></div>
+                                        <div className="flex justify-between gap-4"><span className="text-slate-500">النهاية</span><span className="text-slate-200 font-mono">{formatDate(org.subscription_end)}</span></div>
+                                        <div className="flex justify-between gap-4"><span className="text-slate-500">حد المستخدمين</span><span className="text-slate-200">{org.max_users || '-'}</span></div>
+                                        <div className="flex justify-between gap-4"><span className="text-slate-500">حد السيارات</span><span className="text-slate-200">{org.max_cars || '-'}</span></div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+                                    <h4 className="text-white font-bold mb-4 flex items-center gap-2">
+                                        <Car className="w-5 h-5 text-blue-400" /> آخر السيارات
+                                    </h4>
+                                    <div className="space-y-3">
+                                        {preview.recentCars.length === 0 && <div className="text-sm text-slate-500">لا توجد سيارات</div>}
+                                        {preview.recentCars.map(car => (
+                                            <div key={String(car.id)} className="flex items-center justify-between bg-slate-950 rounded-xl p-3 border border-slate-800">
+                                                <div>
+                                                    <div className="text-sm font-bold text-white">{String(car.name || `${car.make || ''} ${car.model || ''}`.trim() || 'سيارة')}</div>
+                                                    <div className="text-xs text-slate-500">{String(car.plate_number || '-')}</div>
+                                                </div>
+                                                <span className="text-xs text-slate-400">{String(car.status || '-')}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+                                    <h4 className="text-white font-bold mb-4 flex items-center gap-2">
+                                        <Users className="w-5 h-5 text-purple-400" /> آخر المستخدمين
+                                    </h4>
+                                    <div className="space-y-3">
+                                        {preview.recentUsers.length === 0 && <div className="text-sm text-slate-500">لا يوجد مستخدمون</div>}
+                                        {preview.recentUsers.map(user => (
+                                            <div key={String(user.id)} className="flex items-center justify-between bg-slate-950 rounded-xl p-3 border border-slate-800">
+                                                <div className="min-w-0">
+                                                    <div className="text-sm font-bold text-white truncate">{String(user.full_name || 'مستخدم')}</div>
+                                                    <div className="text-xs text-slate-500 truncate">{String(user.email || '-')}</div>
+                                                </div>
+                                                <span className="text-xs text-slate-400">{String(user.role || '-')}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+                                <h4 className="text-white font-bold mb-4 flex items-center gap-2">
+                                    <Receipt className="w-5 h-5 text-emerald-400" /> آخر الحركات المالية
+                                </h4>
+                                <div className="grid gap-2">
+                                    {preview.recentTransactions.length === 0 && <div className="text-sm text-slate-500 py-4">لا توجد حركات مالية</div>}
+                                    {preview.recentTransactions.map(tx => {
+                                        const amount = typeof tx.amount === 'number' ? tx.amount : Number(tx.amount || 0);
+                                        const isIncome = tx.type === 'income';
+                                        return (
+                                            <div key={String(tx.id)} className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-2 md:items-center bg-slate-950 rounded-xl p-3 border border-slate-800">
+                                                <div>
+                                                    <div className="text-sm font-bold text-white">{String(tx.reason || tx.category || (isIncome ? 'إيراد' : 'مصروف'))}</div>
+                                                    <div className="text-xs text-slate-500">{formatDate(tx.date)}</div>
+                                                </div>
+                                                <span className={`text-xs font-bold ${isIncome ? 'text-emerald-400' : 'text-red-400'}`}>{isIncome ? 'إيراد' : 'مصروف'}</span>
+                                                <span className={`text-sm font-bold ${isIncome ? 'text-emerald-400' : 'text-red-400'}`}>{formatMoney(amount)}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
         </div>
     );
 };
