@@ -108,4 +108,41 @@ LANGUAGE sql IMMUTABLE
 AS $$
   SELECT (storage.foldername(name))[level + 1];
 $$;
+
+CREATE TABLE IF NOT EXISTS storage.buckets (
+  id text PRIMARY KEY,
+  name text NOT NULL UNIQUE,
+  owner uuid,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  public boolean DEFAULT false,
+  avif_autodetection boolean DEFAULT false,
+  file_size_limit bigint,
+  allowed_mime_types text[],
+  owner_id text
+);
+
+CREATE TABLE IF NOT EXISTS storage.objects (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  bucket_id text REFERENCES storage.buckets(id),
+  name text,
+  owner uuid,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  last_accessed_at timestamptz DEFAULT now(),
+  metadata jsonb,
+  path_tokens text[] GENERATED ALWAYS AS (string_to_array(name, '/')) STORED,
+  version text,
+  owner_id text,
+  user_metadata jsonb
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS buckets_pkey ON storage.buckets (id);
+CREATE UNIQUE INDEX IF NOT EXISTS bucketid_objname ON storage.objects (bucket_id, name);
+
+ALTER TABLE storage.buckets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+GRANT ALL ON TABLE storage.buckets TO anon, authenticated, service_role, supabase_storage_admin;
+GRANT ALL ON TABLE storage.objects TO anon, authenticated, service_role, supabase_storage_admin;
 SQL
