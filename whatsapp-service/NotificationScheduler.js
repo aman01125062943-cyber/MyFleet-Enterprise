@@ -1,4 +1,8 @@
 import cron from 'node-cron';
+import WebSocket from 'ws';
+if (typeof globalThis.WebSocket === 'undefined') {
+    globalThis.WebSocket = WebSocket;
+}
 import { createClient } from '@supabase/supabase-js';
 
 class NotificationScheduler {

@@ -1,5 +1,9 @@
 import express from 'express';
 import cors from 'cors';
+import WebSocket from 'ws';
+if (typeof globalThis.WebSocket === 'undefined') {
+    globalThis.WebSocket = WebSocket;
+}
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import compression from 'compression';

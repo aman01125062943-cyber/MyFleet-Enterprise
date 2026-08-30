@@ -9,6 +9,10 @@
  * Run with: node notificationWorker.js
  */
 
+import WebSocket from 'ws';
+if (typeof globalThis.WebSocket === 'undefined') {
+    globalThis.WebSocket = WebSocket;
+}
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import MessageService from './MessageService.js';
