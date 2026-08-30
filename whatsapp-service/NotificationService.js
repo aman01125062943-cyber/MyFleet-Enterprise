@@ -12,11 +12,35 @@ class NotificationService {
      */
     async getTemplate(eventName) {
         try {
-            const { data, error } = await this.supabase
-                .from('notification_templates')
-                .select('message_template, is_active')
-                .eq('event_name', eventName)
-                .single();
+            const templateKeyMap = {
+                trial_welcome: 'trial_welcome',
+                paid_welcome: 'subscription_activated',
+                expiry_reminder: 'subscription_expiring',
+                expiry_urgent: 'subscription_expiring'
+            };
+            const templateKey = templateKeyMap[eventName] || eventName;
+
+            let { data, error } = await this.supabase
+                .from('whatsapp_templates')
+                .select('message_template, content, is_active')
+                .eq('category', templateKey)
+                .eq('is_active', true)
+                .order('is_system', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (error) {
+                const fallback = await this.supabase
+                    .from('whatsapp_templates')
+                    .select('content, is_active')
+                    .eq('name', templateKey)
+                    .eq('is_active', true)
+                    .limit(1)
+                    .maybeSingle();
+
+                data = fallback.data;
+                error = fallback.error;
+            }
 
             if (error) {
                 console.error(`[NotificationService] Error fetching template for ${eventName}:`, error.message);
@@ -28,7 +52,7 @@ class NotificationService {
                 return null;
             }
 
-            return data.message_template;
+            return data.message_template || data.content;
         } catch (err) {
             console.error(`[NotificationService] Unexpected error getting template:`, err);
             return null;
@@ -42,7 +66,7 @@ class NotificationService {
      */
     formatMessage(template, data) {
         if (!data) return template;
-        return template.replace(/{(\w+)}/g, (match, key) => {
+        return template.replace(/{{?(\w+)}?}/g, (match, key) => {
             return typeof data[key] !== 'undefined' ? data[key] : match;
         });
     }

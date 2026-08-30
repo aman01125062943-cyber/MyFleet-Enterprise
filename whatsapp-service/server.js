@@ -741,7 +741,7 @@ app.get('/api/messages', authenticateJWT, async (req, res) => {
             .limit(Number.parseInt(limit));
 
         if (sessionId) {
-            query = query.eq('id', sessionId);
+            query = query.eq('session_id', sessionId);
         }
 
         if (req.user.role !== 'super_admin') {

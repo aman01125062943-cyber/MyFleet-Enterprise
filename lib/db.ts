@@ -42,6 +42,17 @@ export interface SyncQueue {
     timestamp: number;
 }
 
+export interface LocalOwnerDistribution {
+    id?: string;
+    org_id: string;
+    owner_name: string;
+    amount: number;
+    date: string;
+    notes?: string;
+    car_id?: string;
+    last_updated: number;
+}
+
 export class MyFleetDB extends Dexie {
     cars!: Table<LocalCar>;
     transactions!: Table<LocalTransaction>;
@@ -49,16 +60,18 @@ export class MyFleetDB extends Dexie {
     profiles!: Table<Profile>;
     expenseTemplates!: Table<ExpenseTemplate>;
     syncQueue!: Table<SyncQueue>;
+    ownerDistributions!: Table<LocalOwnerDistribution>;
 
     constructor() {
         super('MyFleetDB');
-        this.version(2).stores({
+        this.version(3).stores({
             cars: 'id, org_id, plate_number, status, last_updated',
             transactions: 'id, org_id, car_id, date, type, last_updated',
             sessions: 'id, token, expires_at',
             profiles: 'id, org_id',
             expenseTemplates: 'id, user_id, title, is_active',
-            syncQueue: '++id, table, action, timestamp'
+            syncQueue: '++id, table, action, timestamp',
+            ownerDistributions: 'id, org_id, owner_name, date, last_updated'
         });
     }
 }

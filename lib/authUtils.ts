@@ -1,4 +1,3 @@
-/* eslint-env browser */
 /* global BroadcastChannel, MessageEvent, StorageEvent */
 /// <reference lib="dom" />
 

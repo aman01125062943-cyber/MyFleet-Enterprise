@@ -6,13 +6,15 @@ import { LayoutContextType } from './Layout';
 import { useToast } from './ToastProvider';
 import {
   User, Users, LogOut, Shield, Plus, Trash2, AlertCircle, FileText,
-  Building, CreditCard, Lock, Save, Loader2, Printer, TrendingUp, TrendingDown, Edit
+  Building, CreditCard, Lock, Save, Loader2, Printer, TrendingUp, TrendingDown, Edit,
+  Download, Upload
 } from 'lucide-react';
 import { performGlobalLogout } from '../lib/authUtils';
+import { downloadBackupFile, exportTenantBackup, importTenantBackup, TenantBackupFile } from '../lib/tenantBackup';
 
 const Settings: React.FC = () => {
   const { showToast } = useToast();
-  const [activeTab, setActiveTab] = useState<'general' | 'branding' | 'drivers' | 'templates' | 'security' | 'announcements'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'branding' | 'drivers' | 'templates' | 'backup' | 'security' | 'announcements'>('general');
 
   const { user: currentUser, org: contextOrg } = useOutletContext<LayoutContextType>();
 
@@ -29,6 +31,8 @@ const Settings: React.FC = () => {
 
   const [loading, setLoading] = useState(true); // Initial loading state
   const [actionLoading, setActionLoading] = useState(false);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
 
   // Drivers State
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -273,6 +277,44 @@ const Settings: React.FC = () => {
     showToast('تم حذف القالب', 'success');
   };
 
+  const handleExportBackup = async () => {
+    if (!currentUser?.org_id) {
+      showToast('لم يتم العثور على المنشأة الحالية', 'error');
+      return;
+    }
+
+    setBackupLoading(true);
+    try {
+      const backup = await exportTenantBackup(currentUser.org_id);
+      downloadBackupFile(backup, org?.name);
+      showToast('تم تنزيل النسخة الاحتياطية بنجاح', 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'حدث خطأ أثناء تنزيل النسخة';
+      showToast(message, 'error');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleImportBackup = async (file: File | null) => {
+    if (!file || !currentUser?.org_id) return;
+    if (!confirm('سيتم دمج بيانات النسخة الاحتياطية مع بيانات منشأتك الحالية. هل تريد المتابعة؟')) return;
+
+    setImportLoading(true);
+    try {
+      const text = await file.text();
+      const backup = JSON.parse(text) as TenantBackupFile;
+      const counts = await importTenantBackup(currentUser.org_id, backup);
+      const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+      showToast(`تم استيراد النسخة الاحتياطية بنجاح (${total} سجل)`, 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'ملف النسخة الاحتياطية غير صالح';
+      showToast(message, 'error');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   // --- Render Helpers ---
 
   if (loading) {
@@ -308,6 +350,7 @@ const Settings: React.FC = () => {
           { id: 'branding', label: 'هوية التقرير', icon: Printer },
           { id: 'drivers', label: 'إدارة السائقين', icon: Users },
           { id: 'templates', label: 'قوالب المصاريف', icon: FileText }, // New!
+          { id: 'backup', label: 'النسخ الاحتياطي', icon: Download },
           { id: 'security', label: 'الأمان', icon: Lock },
           // Only show Announcements for Super Admin (Platform Owner) who has NO org_id
           ...(currentUser?.role === 'admin' && !currentUser?.org_id ? [{ id: 'announcements', label: 'إدارة التحديثات', icon: AlertCircle }] : []),
@@ -632,7 +675,62 @@ const Settings: React.FC = () => {
           </div>
         )}
 
-        {/* 5. SECURITY TAB Starts Here... (Renumbered logically) */}
+        {/* 5. BACKUP TAB */}
+        {activeTab === 'backup' && (
+          <div className="space-y-6 animate-in slide-in-from-bottom-2 fade-in">
+            <div className="bg-white dark:bg-[#1e293b] rounded-2xl border border-gray-200 dark:border-slate-700 p-6 shadow-sm">
+              <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-2">
+                <Download className="w-5 h-5 text-blue-500" /> النسخ الاحتياطي للمنشأة
+              </h3>
+              <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
+                يمكنك تنزيل ملف يحتوي على بيانات منشأتك فقط، ثم استيراده لاحقاً لنفس المنشأة عند الحاجة.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={handleExportBackup}
+                  disabled={backupLoading || !currentUser?.org_id}
+                  className="min-h-32 rounded-2xl border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-950/20 hover:bg-blue-100 dark:hover:bg-blue-950/30 text-blue-700 dark:text-blue-300 p-5 text-right transition disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+                      {backupLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                    </span>
+                    <span className="font-bold">تنزيل نسخة احتياطية</span>
+                  </div>
+                  <span className="block text-xs leading-6 text-slate-600 dark:text-slate-400">
+                    يشمل بيانات المنشأة، المستخدمين، السيارات، الحركات، السائقين، الأصول، والواتساب المرتبط بالمنشأة.
+                  </span>
+                </button>
+
+                <label className={`min-h-32 rounded-2xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 p-5 text-right transition ${importLoading ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    className="hidden"
+                    disabled={importLoading || !currentUser?.org_id}
+                    onChange={(event) => {
+                      handleImportBackup(event.target.files?.[0] || null);
+                      event.currentTarget.value = '';
+                    }}
+                  />
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center">
+                      {importLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+                    </span>
+                    <span className="font-bold">استيراد نسخة احتياطية</span>
+                  </div>
+                  <span className="block text-xs leading-6 text-slate-600 dark:text-slate-400">
+                    اختر ملف النسخة السابق. سيتم قبول الملف فقط إذا كان يخص نفس المنشأة الحالية.
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 6. SECURITY TAB Starts Here... */}
         {activeTab === 'security' && (
           <div className="bg-white dark:bg-[#1e293b] rounded-2xl border border-gray-200 dark:border-slate-700 p-6 max-w-lg animate-in slide-in-from-bottom-2 fade-in shadow-sm">
             <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">

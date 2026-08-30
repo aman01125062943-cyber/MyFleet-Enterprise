@@ -7,7 +7,30 @@ import sonarjs from "eslint-plugin-sonarjs";
 export default [
     js.configs.recommended,
     {
-        ignores: ["dist/**", "node_modules/**", "db_scripts_archive/**", "maintenance_scripts/**", ".agent/**", "eslint.config.js", "postcss.config.js", "tailwind.config.js", "vite.config.ts", "tsconfig.json", "whatsapp-service/**"]
+        ignores: [
+            "dist/**",
+            "node_modules/**",
+            ".venv/**",
+            "chrome-devtools-mcp/**",
+            "db_scripts_archive/**",
+            "maintenance_scripts/**",
+            "testsprite_tests/**",
+            "test-output/**",
+            "screenshots/**",
+            "src/**",
+            "agents/**",
+            ".agent/**",
+            ".kilocode/**",
+            "*.cjs",
+            "*.js",
+            "eslint.config.js",
+            "postcss.config.js",
+            "tailwind.config.js",
+            "vite.config.ts",
+            "tsconfig.json",
+            "whatsapp-service/**",
+            "whatsapp-server/**"
+        ]
     },
     {
         files: ["**/*.ts", "**/*.tsx"],

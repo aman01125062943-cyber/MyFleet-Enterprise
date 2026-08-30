@@ -4,7 +4,6 @@ import { RefreshCw, ArrowUpCircle } from 'lucide-react';
 
 export const UpdateNotification = () => {
     const [hasUpdate, setHasUpdate] = useState(false);
-    const [currentVersion, setCurrentVersion] = useState<string | null>(null);
 
     const reloadPage = () => {
         // Force reload and ignore cache (deprecated but effective with our Nginx config)
@@ -14,7 +13,6 @@ export const UpdateNotification = () => {
     useEffect(() => {
         // 1. Get initial version on load
         const initialVersion = (window as any)._env_?.APP_VERSION;
-        setCurrentVersion(initialVersion);
 
         if (!initialVersion) return;
 

@@ -75,6 +75,18 @@ export interface Transaction {
   notes?: string;
 }
 
+export interface OwnerDistribution {
+  id: string;
+  org_id: string;
+  owner_name: string;
+  amount: number;
+  date: string;
+  notes?: string;
+  car_id?: string;
+  car_name?: string;
+  created_at?: string;
+}
+
 export interface CarStats {
   total_income: number;
   total_expense: number;
@@ -316,8 +328,6 @@ export interface SystemConfig {
   instapay_handle?: string;
   vodafone_cash_number?: string;
   show_subscription_banner: boolean;
-  grace_period_days?: number; // Default: 7 days
-  grace_period_allowed_modules?: (keyof UserPermissions)[]; // e.g. ['inventory']
   available_plans: Plan[];
   survey_link?: string;
   support_contact?: string;

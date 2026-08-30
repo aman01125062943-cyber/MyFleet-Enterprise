@@ -240,7 +240,7 @@ class MessageService {
 
             if (!session) return;
 
-            await this.supabase
+            let { error: logError } = await this.supabase
                 .from('whatsapp_messages')
                 .insert({
                     org_id: session.org_id,
@@ -252,6 +252,38 @@ class MessageService {
                     error_message: error,
                     sent_at: status === 'sent' ? new Date().toISOString() : null
                 });
+
+            if (logError) {
+                const fallback = await this.supabase
+                    .from('whatsapp_messages')
+                    .insert({
+                        org_id: session.org_id,
+                        session_id: sessionId,
+                        phone_number: recipient,
+                        message_body: content,
+                        message_type: type,
+                        status: status,
+                        error_message: error,
+                        sent_at: status === 'sent' ? new Date().toISOString() : null
+                    });
+                logError = fallback.error;
+            }
+
+            if (logError) {
+                const fallback = await this.supabase
+                    .from('whatsapp_messages')
+                    .insert({
+                        session_id: sessionId,
+                        phone_number: recipient.replace(/\D/g, ''),
+                        message: content,
+                        sent_at: status === 'sent' ? new Date().toISOString() : null
+                    });
+                logError = fallback.error;
+            }
+
+            if (logError) {
+                console.error('[MessageService] Error logging message:', logError);
+            }
         } catch (err) {
             console.error('[MessageService] Error logging message:', err);
         }

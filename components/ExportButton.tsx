@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, FileSpreadsheet, Database, FileJson } from 'lucide-react';
+import { Download, FileSpreadsheet, FileJson } from 'lucide-react';
 
 type ExportType = 'users' | 'organizations' | 'cars';
 type ExportFormat = 'csv' | 'excel' | 'json';
@@ -19,14 +19,6 @@ const ExportButton: React.FC<ExportButtonProps> = ({ type, data, filename }) => 
             case 'users': return 'المستخدمين';
             case 'organizations': return 'المنظمات';
             case 'cars': return 'السيارات';
-        }
-    };
-
-    const getTypeIcon = () => {
-        switch (type) {
-            case 'users': return <Database className="w-5 h-5" />;
-            case 'organizations': return <FileSpreadsheet className="w-5 h-5" />;
-            case 'cars': return <Database className="w-5 h-5" />;
         }
     };
 

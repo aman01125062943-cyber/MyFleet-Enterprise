@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { RefreshCw, Sparkles, AlertCircle } from 'lucide-react';
+import { RefreshCw, Sparkles } from 'lucide-react';
 import { useAutoUpdate } from '../hooks/useAutoUpdate';
 
 export const UpdateBanner = () => {

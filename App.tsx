@@ -26,6 +26,7 @@ const PricingPage = React.lazy(() => import('./components/PricingPage'));
 const SubscriptionRoute = React.lazy(() => import('./components/SubscriptionRoute'));
 const MaintenancePage = React.lazy(() => import('./components/MaintenancePage'));
 const UpdateRequiredPage = React.lazy(() => import('./components/UpdateRequiredPage'));
+const OwnerExpenses = React.lazy(() => import('./components/OwnerExpenses'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -262,8 +263,18 @@ const RootRedirect: React.FC = () => {
     if (hasNavigated.current) return;
 
     const decideRoute = async () => {
-      // 0. Fetch System Config
-      const config = await fetchSystemConfig();
+      // 0. Fetch System Config with 2.5s Timeout Safety
+      const configPromise = fetchSystemConfig();
+      const timeoutPromise = new Promise<any>((resolve) =>
+        setTimeout(() => resolve(null), 2500)
+      );
+
+      const fetchedConfig = await Promise.race([configPromise, timeoutPromise]);
+      const config = fetchedConfig || {
+        maintenance_mode: false,
+        default_entry_page: 'login',
+        min_app_version: '1.0.0'
+      };
 
       // 0.1. Check Minimum App Version
       if (config.min_app_version && compareVersions(CURRENT_APP_VERSION, config.min_app_version) < 0) {
@@ -274,27 +285,39 @@ const RootRedirect: React.FC = () => {
       }
 
       // 1. Check localStorage first (FAST PATH)
-      const cachedUser = await checkCachedSession();
-      if (cachedUser) {
-        if (validateAndNavigateUser(cachedUser, config, navigate)) {
-          hasNavigated.current = true;
-          return;
+      try {
+        const cachedUser = await checkCachedSession();
+        if (cachedUser) {
+          if (validateAndNavigateUser(cachedUser, config, navigate)) {
+            hasNavigated.current = true;
+            return;
+          }
         }
+      } catch (e) {
+        console.warn('Cached session check failed:', e);
       }
 
       // 2. Online Check with Server Validation (PRIMARY PATH)
-      const onlineUser = await checkOnlineSession();
-      if (onlineUser) {
-        if (validateAndNavigateUser(onlineUser, config, navigate)) {
-          hasNavigated.current = true;
-          return;
+      try {
+        const onlineUser = await checkOnlineSession();
+        if (onlineUser) {
+          if (validateAndNavigateUser(onlineUser, config, navigate)) {
+            hasNavigated.current = true;
+            return;
+          }
         }
+      } catch (e) {
+        console.warn('Online session check failed:', e);
       }
 
       // 3. Offline Fallback Check (INDEXEDDB)
-      if (await checkOfflineSession(config, navigate)) {
-        hasNavigated.current = true;
-        return;
+      try {
+        if (await checkOfflineSession(config, navigate)) {
+          hasNavigated.current = true;
+          return;
+        }
+      } catch (e) {
+        console.warn('Offline session check failed:', e);
       }
 
       // 4. No Session - Use Default Entry Page Setting
@@ -311,8 +334,12 @@ const RootRedirect: React.FC = () => {
       }
     };
 
-    decideRoute();
-  }, []); // Empty dependency array - run once
+    decideRoute().catch((err) => {
+      console.error('Routing decision failed, falling back to /login:', err);
+      hasNavigated.current = true;
+      navigate('/login', { replace: true });
+    });
+  }, [navigate]);
 
   return <PageLoader />;
 };
@@ -368,6 +395,7 @@ const App: React.FC = () => {
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/inventory" element={<Inventory />} />
                   <Route path="/financials" element={<Financials />} />
+                  <Route path="/owner-expenses" element={<OwnerExpenses />} />
                   <Route path="/team" element={<Team />} />
                   <Route path="/assets" element={<Assets />} />
                   <Route path="/backup" element={<BackupPage />} />

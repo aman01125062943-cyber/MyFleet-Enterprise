@@ -330,6 +330,13 @@ export async function assertPermission(
       }
     );
   }
+  if (!profile) {
+    throw new PermissionError(errorMessage || 'Permission denied', {
+      code: 'NO_PROFILE',
+      module,
+      action,
+    });
+  }
 
   // ====================================================================
   // Step 2: Optional server-side validation
@@ -373,8 +380,7 @@ export async function assertPermission(
   // ====================================================================
   // Step 3: Check module/action permission
   // ====================================================================
-  const finalProfile = validatedProfile as Profile;
-  const permissionCheck = hasPermission(finalProfile.permissions, module, action);
+  const permissionCheck = hasPermission(validatedProfile.permissions, module, action);
 
   if (!permissionCheck.granted) {
     throw new PermissionError(
@@ -383,8 +389,8 @@ export async function assertPermission(
         code: action ? 'ACTION_NOT_ALLOWED' : 'MODULE_ACCESS_DENIED',
         module,
         action,
-        userId: finalProfile.id,
-        userRole: finalProfile.role,
+        userId: validatedProfile.id,
+        userRole: validatedProfile.role,
       }
     );
   }
@@ -429,8 +435,9 @@ export function assertRole(
       }
     );
   }
+  if (!profile) return;
 
-  const roleCheck = validateRoleAccess(profile as Profile, requiredRoles);
+  const roleCheck = validateRoleAccess(profile, requiredRoles);
   if (!roleCheck.granted) {
     throw new PermissionError(
       errorMessage || `This action requires one of the following roles: ${requiredRoles.join(', ')}`,
@@ -508,8 +515,9 @@ export function checkRole(
   if (!statusCheck.granted) {
     return false;
   }
+  if (!profile) return false;
 
-  const roleCheck = validateRoleAccess(profile as Profile, requiredRoles);
+  const roleCheck = validateRoleAccess(profile, requiredRoles);
   return roleCheck.granted;
 }
 
@@ -624,3 +632,4 @@ export const PERMISSION_GUARD_CONFIG = {
   VERSION: '1.0.0',
   DEFAULT_PERMISSION_ACTION: 'view',
 };
+

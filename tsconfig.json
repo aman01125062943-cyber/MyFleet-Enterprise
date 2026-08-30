@@ -27,10 +27,30 @@
     }
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx"
+    "App.tsx",
+    "index.tsx",
+    "types.ts",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "hooks/**/*.ts",
+    "hooks/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "services/**/*.ts",
+    "services/**/*.tsx"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "dist",
+    ".venv",
+    "chrome-devtools-mcp",
+    "db_scripts_archive",
+    "maintenance_scripts",
+    "testsprite_tests",
+    "test-output",
+    "screenshots",
+    "src",
+    "whatsapp-service",
+    "whatsapp-server"
   ]
 }

@@ -14,7 +14,6 @@
 import { supabase } from './supabaseClient';
 import { performGlobalLogout } from './authUtils';
 import { Profile, UserPermissions } from '../types';
-import type { Session, User } from '@supabase/supabase-js';
 
 // ====================================================================
 // Configuration
@@ -297,8 +296,7 @@ export const secureRpcCall = async <T = unknown>(
                         console.log(`🔄 Auth error detected, attempting token refresh...`);
 
                         // Try to refresh the session
-                        const { error: refreshError } =
-                            await supabase.auth.refreshSession();
+                        const { error: refreshError } = await supabase.auth.refreshSession();
 
                         if (refreshError) {
                             // Refresh failed - use centralized logout
@@ -498,8 +496,8 @@ export const secureRpcCallWithPermission = async <T = unknown>(
  */
 export const checkSessionValidity = async (): Promise<{
     isValid: boolean;
-    session: Session | null;
-    user: User | null;
+    session: any | null;
+    user: any | null;
 }> => {
     try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -549,7 +547,7 @@ export const apiGet = (url: string, options?: Omit<AuthenticatedFetchOptions, 'b
 /**
  * POST request with automatic auth
  */
-export const apiPost = (url: string, data?: unknown, options?: Omit<AuthenticatedFetchOptions, 'body'>) => {
+export const apiPost = (url: string, data?: any, options?: Omit<AuthenticatedFetchOptions, 'body'>) => {
     return authenticatedFetch(url, {
         ...options,
         method: 'POST',
@@ -560,7 +558,7 @@ export const apiPost = (url: string, data?: unknown, options?: Omit<Authenticate
 /**
  * PUT request with automatic auth
  */
-export const apiPut = (url: string, data?: unknown, options?: Omit<AuthenticatedFetchOptions, 'body'>) => {
+export const apiPut = (url: string, data?: any, options?: Omit<AuthenticatedFetchOptions, 'body'>) => {
     return authenticatedFetch(url, {
         ...options,
         method: 'PUT',

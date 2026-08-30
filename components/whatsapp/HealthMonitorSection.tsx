@@ -4,9 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabaseClient';
-import { AlertTriangle, CheckCircle, XCircle, Clock, RefreshCw, X, Info, Activity } from 'lucide-react';
-import { getActiveIncidents, resolveIncident, getHealthSummary, checkSystemHealth, runHealthChecks } from '../../lib/healthMonitor';
+import { AlertTriangle, CheckCircle, XCircle, Clock, RefreshCw, Info, Activity } from 'lucide-react';
+import { getActiveIncidents, resolveIncident, getHealthSummary, runHealthChecks } from '../../lib/healthMonitor';
 import { SystemIncident, HealthSummary } from '../../lib/healthMonitor';
 
 const HealthMonitorSection: React.FC = () => {

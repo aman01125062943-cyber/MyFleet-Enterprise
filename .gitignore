@@ -23,6 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 .env
+.venv/
+test-output/
+screenshots/
+chrome-devtools-mcp/node_modules/
 
 # WhatsApp Service
 whatsapp-service/auth_sessions/

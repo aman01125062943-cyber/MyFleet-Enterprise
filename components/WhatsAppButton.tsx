@@ -8,13 +8,17 @@ export function WhatsAppButton() {
 
     useEffect(() => {
         const fetchWhatsApp = async () => {
-            const { data } = await supabase
-                .from("public_config")
-                .select("whatsapp_number")
-                .single();
+            try {
+                const { data } = await supabase
+                    .from("public_config")
+                    .select("whatsapp_number")
+                    .maybeSingle();
 
-            if (data?.whatsapp_number) {
-                setWhatsappNumber(data.whatsapp_number);
+                if (data?.whatsapp_number) {
+                    setWhatsappNumber(data.whatsapp_number);
+                }
+            } catch (err) {
+                console.warn('Failed to fetch WhatsApp number:', err);
             }
         };
 

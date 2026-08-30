@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabaseClient';
 import {
   Car, Home, Users, Settings, LogOut,
   ShieldCheck, Calculator, Crown, Sun, Moon, AlertTriangle, Lock, ArrowRight,
-  Wifi, WifiOff, Database, ChevronLeft, Menu, DollarSign, Wrench, Download
+  Wifi, WifiOff, Database, ChevronLeft, Menu, DollarSign, Wrench, Download, Wallet
 } from 'lucide-react';
 import { seedLocalDB, syncData } from '../lib/syncManager';
 import { Profile, Organization, UserPermissions, SystemConfig } from '../types';
@@ -226,34 +226,10 @@ const Layout: React.FC = () => {
   const daysDiff = Math.ceil((effectiveEndDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
   const daysLeft = org ? daysDiff : 999;
 
-  const graceDays = systemConfig?.grace_period_days ?? 7;
   const isExpired = org ? daysLeft < 0 : false;
-
-  // 🔒 تحديد ما إذا كان النظام محظوراً تماماً
-  // يتم الحظر إذا:
-  // 1. تجاوز المستخدم فترة السماح (daysLeft < -graceDays)
-  // 2. أو تم تعطيل المنظمة يدوياً (is_active === false)
-  // 3. يستثنى المدير العام (super_admin) من الحظر لضمان قدرته على الإدارة
-  const isFullyBlocked = org
-    ? (daysLeft < -graceDays || org.is_active === false) && userProfile?.role !== 'super_admin'
-    : false;
-
-  const isInGracePeriod = isExpired && !isFullyBlocked;
-  const daysInGraceLeft = graceDays + daysLeft;
+  const isFullyBlocked = org ? (isExpired || org.is_active === false) : false;
   const isNearExpiry = org ? (daysLeft >= 0 && daysLeft <= 3) : false;
   const isReadOnly = isFullyBlocked;
-
-  const checkPlanLimits = (module: keyof UserPermissions): boolean => {
-    if (!org || !systemConfig?.available_plans) return true;
-    const plan = systemConfig.available_plans.find(p => p.id === org.subscription_plan)
-      || systemConfig.available_plans.find(p => p.id === 'trial');
-
-    if (plan?.features) {
-      const feature = plan.features[module];
-      if (typeof feature === 'boolean' && feature === false) return false;
-    }
-    return true;
-  };
 
   const checkUserPermissions = (module: keyof UserPermissions, action?: string): boolean => {
     if (!userProfile?.permissions) return false;
@@ -267,10 +243,6 @@ const Layout: React.FC = () => {
 
   const can = (module: keyof UserPermissions, action?: string) => {
     if (isFullyBlocked) return false;
-    if (isInGracePeriod) {
-      const allowedInGrace = systemConfig?.grace_period_allowed_modules || ['inventory'];
-      if (!allowedInGrace.includes(module)) return false;
-    }
 
     // ✅ استخدام planPermissionGuard للتحقق من حدود الباقة
     const planId = org?.subscription_plan || 'trial';
@@ -285,6 +257,7 @@ const Layout: React.FC = () => {
     { id: 'dashboard', label: 'الرئيسية', icon: Home, path: '/dashboard', show: true },
     { id: 'inventory', label: 'السيارات والحركات', icon: Car, path: '/inventory', show: can('inventory') },
     { id: 'finance', label: 'الإدارة المالية', icon: DollarSign, path: '/financials', show: can('finance') },
+    { id: 'owner_expenses', label: 'مسحوبات الشركاء', icon: Wallet, path: '/owner-expenses', show: can('finance') },
     { id: 'calculator', label: 'حاسبة الرحلات', icon: Calculator, path: '/calculator', show: true },
     { id: 'maintenance', label: 'الصيانة الدورية', icon: Wrench, path: '/maintenance', show: can('inventory', 'manage_status') },
     { id: 'team', label: 'فريق العمل', icon: Users, path: '/team', show: can('team') },
@@ -400,7 +373,7 @@ const Layout: React.FC = () => {
           </div>
         </header>
 
-        {/* Global Alerts (Blocking Mode, Grace Period etc) */}
+        {/* Global Alerts */}
         {isFullyBlocked && (
           <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-center p-6 space-y-6 animate-in fade-in duration-500">
             <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mb-4">
@@ -408,16 +381,16 @@ const Layout: React.FC = () => {
             </div>
             <h2 className="text-3xl font-bold text-white uppercase tracking-tight">نظام معطل تماماً</h2>
             <p className="text-slate-400 max-w-md text-lg">
-              عذراً، الوصول للنظام معطل حالياً لهذه المنظمة. قد يكون ذلك بسبب انتهاء فترة السماح أو تم تعطيل الحساب من قبل الإدارة.
+              عذراً، الوصول للنظام معطل حالياً لهذه المنظمة. انتهت مدة الاشتراك أو تم تعطيل الحساب من قبل الإدارة.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 w-full max-w-xs">
               <a
-                href={`https://wa.me/${systemConfig?.whatsapp_number || '201066284516'}?text=السلام عليكم، أرغب في تجديد الاشتراك لمركز: ${org?.name} (معرف: ${org?.id})`}
+                href={`https://wa.me/${systemConfig?.whatsapp_number || '201066284516'}`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition"
               >
-                <Wifi className="w-5 h-5" /> تحدث معنا للتجديد
+                <Home className="w-5 h-5" /> تحدث معنا للتفعيل
               </a>
               <button
                 onClick={handleLogout}
@@ -426,16 +399,9 @@ const Layout: React.FC = () => {
                 <LogOut className="w-5 h-5" /> تسجيل الخروج
               </button>
             </div>
-            <p className="text-xs text-slate-500 mt-4">معرف الوكالة: {org?.id}</p>
           </div>
         )}
-        {!isFullyBlocked && isInGracePeriod && (
-          <div className="bg-red-600 text-white px-4 py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-md z-30 animate-in slide-in-from-top-full print:hidden">
-            <AlertTriangle className="w-4 h-4" />
-            <span>فترة سماح (صلاحيات محدودة): اشتراكك منتهٍ. سيتوقف النظام تماماً خلال {daysInGraceLeft} أيام.</span>
-          </div>
-        )}
-        {!isFullyBlocked && !isInGracePeriod && !isExpired && isNearExpiry && systemConfig?.show_subscription_banner !== false && (
+        {!isFullyBlocked && !isExpired && isNearExpiry && systemConfig?.show_subscription_banner !== false && (
           <div className="bg-orange-500 text-white px-4 py-2 text-sm font-bold flex items-center justify-center gap-2 shadow-md z-30 print:hidden">
             <AlertTriangle className="w-4 h-4" />
             <span>تنبيه: اشتراكك سينتهي خلال {daysLeft} يوم.</span>
@@ -494,9 +460,9 @@ const Layout: React.FC = () => {
         </div>
       )}
 
-      {/* Unified Block Modal for Trials and Legacy Blocking */}
+      {/* Block Modal */}
       {
-        org?.subscription_plan === 'trial' && isExpired && !isFullyBlocked && (
+        org?.subscription_plan === 'trial' && isExpired && (
           <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex items-center justify-center p-4">
             <div className="bg-white dark:bg-[#1e293b] w-full max-w-md p-8 rounded-3xl shadow-2xl text-center border border-slate-700 animate-in zoom-in-95 duration-300">
               <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -508,7 +474,7 @@ const Layout: React.FC = () => {
               </p>
 
               <a
-                href={`https://wa.me/${systemConfig?.whatsapp_number || '201066284516'}?text=السلام عليكم، انتهت الفترة التجريبية لمنظمة ${org?.name} وارغب في الاشتراك في الباقة المدفوعة`}
+                href={`https://wa.me/${systemConfig?.whatsapp_number || '966500000000'}?text=السلام عليكم، انتهت الفترة التجريبية وارغب في الاشتراك في الباقة المدفوعة`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition-all hover:scale-[1.02] shadow-lg shadow-emerald-500/20"

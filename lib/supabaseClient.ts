@@ -32,7 +32,8 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         detectSessionInUrl: true,
 
         // Persist session across page reloads
-        persistSession: true
+        persistSession: true,
+
     },
     // Global request options for debugging and tracking
     global: {

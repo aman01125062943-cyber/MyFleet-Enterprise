@@ -1,5 +1,6 @@
 /* eslint-disable no-undef */
 const fetch = require('node-fetch');
+require('dotenv').config();
 
 async function testNotification() {
     console.log('🚀 Testing Notification Service API...');
@@ -16,8 +17,12 @@ async function testNotification() {
     // Alternative: Use the internal test endpoint? No, that's just for raw messages.
     // Let's try to login as the admin first to get a token.
 
-    const SUPABASE_URL = process.env.SUPABASE_URL || 'https://necqtqhmnmcsjxcxgeff.supabase.co';
-    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5lY3F0cWhtbm1jc2p4Y3hnZWZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzODg1NTUsImV4cCI6MjA4NDk2NDU1NX0.vpSOLJbEN1JrASDLiZ1G6-yT_QUZo0JzEDKefKANAaQ';
+    const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+        throw new Error('Missing SUPABASE_URL/VITE_SUPABASE_URL or Supabase key');
+    }
 
     // We can't easily login with service key via REST to get a User JWT.
     // But we can sign our own JWT if we had the secret.

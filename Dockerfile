@@ -19,8 +19,8 @@ RUN cd whatsapp-service && npm install
 COPY . .
 
 # Accept Supabase environment variables for Vite build
-ARG VITE_SUPABASE_URL="https://necqtqhmnmcsjxcxgeff.supabase.co"
-ARG VITE_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5lY3F0cWhtbm1jc2p4Y3hnZWZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkzODg1NTUsImV4cCI6MjA4NDk2NDU1NX0.vpSOLJbEN1JrASDLiZ1G6-yT_QUZo0JzEDKefKANAaQ"
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
 
 # Export as ENV so Vite build-time script can see them
 ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
