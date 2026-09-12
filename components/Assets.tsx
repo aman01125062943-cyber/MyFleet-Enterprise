@@ -409,8 +409,8 @@ const Assets: React.FC = () => {
 
             {/* Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg border border-slate-200 dark:border-slate-700 p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-700 p-5 sm:p-6 shadow-2xl animate-in zoom-in-95 duration-200 my-auto">
                         <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-6">
                             {formData.id ? 'تعديل بيانات الأصل' : 'إضافة أصل جديد'}
                         </h2>
@@ -579,8 +579,8 @@ const Assets: React.FC = () => {
 
             {/* Manage Drivers Modal */}
             {showDriverModal && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-[#1e293b] w-full max-w-lg rounded-2xl border border-slate-700 p-6 flex flex-col max-h-[85vh]">
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+                    <div className="bg-white dark:bg-[#1e293b] w-full max-w-lg rounded-2xl border border-slate-700 p-5 sm:p-6 flex flex-col max-h-[85vh] my-auto">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-xl font-bold text-slate-800 dark:text-white">إدارة السائقين</h3>
                             <button onClick={() => setShowDriverModal(false)}><Trash2 className="w-5 h-5 text-slate-400 rotate-45" /></button>

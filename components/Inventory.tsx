@@ -785,7 +785,7 @@ const Inventory: React.FC = () => {
             {/* 1. ADD / EDIT CAR MODAL */}
             {(showAddCar || showEditCar) && (
                 <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
                     onClick={(e) => {
                         // Close on backdrop click
                         if (e.target === e.currentTarget) {
@@ -794,7 +794,7 @@ const Inventory: React.FC = () => {
                         }
                     }}
                 >
-                    <div className="bg-white dark:bg-[#1e293b] w-[95%] md:w-full max-w-lg rounded-3xl p-5 md:p-8 shadow-2xl border border-gray-200 dark:border-slate-700 animate-in zoom-in-95 my-auto relative">
+                    <div className="bg-white dark:bg-[#1e293b] w-[95%] md:w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl p-5 md:p-8 shadow-2xl border border-gray-200 dark:border-slate-700 animate-in zoom-in-95 my-auto relative">
                         <button
                             onClick={() => { setShowAddCar(false); setShowEditCar(false) }}
                             className="absolute left-4 top-4 p-2 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 transition"
@@ -917,12 +917,12 @@ const Inventory: React.FC = () => {
             {/* 2. ADD / EDIT TRANSACTION MODAL (Updated Z-Index) */}
             {showAddTx && (
                 <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
                     onClick={(e) => {
                         if (e.target === e.currentTarget) setShowAddTx(false);
                     }}
                 >
-                    <div className="bg-white dark:bg-[#1e293b] w-[95%] md:w-full max-w-sm rounded-2xl p-5 md:p-6 shadow-2xl border border-gray-200 dark:border-slate-700 animate-in zoom-in-95 relative">
+                    <div className="bg-white dark:bg-[#1e293b] w-full max-w-sm rounded-2xl p-5 sm:p-6 shadow-2xl border border-gray-200 dark:border-slate-700 animate-in zoom-in-95 relative max-h-[90vh] overflow-y-auto my-auto">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                                 {newTx.type === 'income' ? <TrendingUp className="text-emerald-500" /> : <TrendingDown className="text-red-500" />}
@@ -1049,8 +1049,8 @@ const Inventory: React.FC = () => {
 
             {/* 3. DELETE CONFIRMATION MODAL (Updated Z-Index & Logic) */}
             {showDeleteModal && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-[#1e293b] w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-gray-200 dark:border-slate-700 animate-in zoom-in-95">
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+                    <div className="bg-white dark:bg-[#1e293b] w-full max-w-sm rounded-3xl p-5 sm:p-6 shadow-2xl border border-gray-200 dark:border-slate-700 animate-in zoom-in-95 my-auto max-h-[90vh] overflow-y-auto">
                         <div className="flex flex-col items-center text-center">
                             <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4">
                                 <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-500" />

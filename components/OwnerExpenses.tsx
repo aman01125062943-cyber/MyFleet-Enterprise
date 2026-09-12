@@ -552,8 +552,8 @@ const OwnerExpenses: React.FC = () => {
 
       {/* Modal: Add New Withdrawal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#1e293b] w-full max-w-md rounded-3xl p-6 border border-gray-100 dark:border-slate-700 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-[#1e293b] w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl p-5 sm:p-6 border border-gray-100 dark:border-slate-700 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200 my-auto">
             
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 pb-4">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -662,8 +662,8 @@ const OwnerExpenses: React.FC = () => {
 
       {/* Modal: Config Owners & Percentages */}
       {showConfigModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#1e293b] w-full max-w-md rounded-3xl p-6 border border-gray-100 dark:border-slate-700 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-[#1e293b] w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl p-5 sm:p-6 border border-gray-100 dark:border-slate-700 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200 my-auto">
             
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 pb-4">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">

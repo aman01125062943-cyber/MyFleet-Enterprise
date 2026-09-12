@@ -521,8 +521,8 @@ const Settings: React.FC = () => {
 
             {/* Add Driver Modal */}
             {showAddDriver && (
-              <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                <div className="bg-white dark:bg-[#1e293b] w-full max-w-sm rounded-2xl border border-gray-200 dark:border-slate-700 p-6 animate-in zoom-in-95 shadow-2xl">
+              <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+                <div className="bg-white dark:bg-[#1e293b] w-full max-w-sm rounded-2xl border border-gray-200 dark:border-slate-700 p-5 sm:p-6 animate-in zoom-in-95 shadow-2xl max-h-[90vh] overflow-y-auto my-auto">
                   <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-4">إضافة سائق جديد</h3>
                   <form onSubmit={handleAddDriver} className="space-y-4">
                     <div>
@@ -623,8 +623,8 @@ const Settings: React.FC = () => {
 
             {/* Add Template Modal */}
             {showAddTemplate && (
-              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                <div className="bg-white dark:bg-[#1e293b] w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-gray-200 dark:border-slate-700 animate-in zoom-in-95">
+              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+                <div className="bg-white dark:bg-[#1e293b] w-full max-w-sm rounded-3xl p-5 sm:p-6 shadow-2xl border border-gray-200 dark:border-slate-700 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto my-auto">
                   <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-6">
                     {editingTemplateId ? 'تعديل القالب' : 'إضافة قالب جديد'}
                   </h3>

@@ -2268,8 +2268,8 @@ const PlanEditModal: React.FC<{ plan: Plan, onClose: () => void, onSave: (p: Pla
     };
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4 animate-in fade-in">
-            <div className="bg-slate-900 w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-700 p-6 shadow-2xl">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in">
+            <div className="bg-slate-900 w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-700 p-5 sm:p-6 shadow-2xl my-auto">
                 <h3 className="text-xl font-bold text-white mb-6">
                     {plan.id ? 'تعديل الباقة' : 'باقة جديدة'}
                 </h3>
@@ -3115,8 +3115,8 @@ const DiscountCodesSection: React.FC = () => {
 
             {/* Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-                    <div className="bg-slate-900 w-full max-w-lg rounded-2xl border border-slate-700 p-6">
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+                    <div className="bg-slate-900 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-700 p-5 sm:p-6 my-auto">
                         <h3 className="text-xl font-bold text-white mb-6">
                             {editingCode ? 'تعديل الكود' : 'كود خصم جديد'}
                         </h3>
@@ -3424,8 +3424,8 @@ const PaymentRequestsSection: React.FC<{ currentUser: Profile | null }> = ({ cur
 
             {/* Reject Modal */}
             {selectedRequest && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-                    <div className="bg-slate-900 w-full max-w-md rounded-2xl border border-slate-700 p-6">
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[110] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+                    <div className="bg-slate-900 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-700 p-5 sm:p-6 my-auto">
                         <h3 className="text-xl font-bold text-white mb-4">رفض طلب الدفع</h3>
                         <div className="mb-4">
                             <label htmlFor="reject-reason" className="block text-sm text-slate-400 mb-2">سبب الرفض</label>

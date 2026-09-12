@@ -533,8 +533,8 @@ const Team: React.FC = () => {
 
             {/* PERMISSIONS MATRIX MODAL */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-[#0f172a] w-full max-w-4xl rounded-3xl border border-slate-700 shadow-2xl flex flex-col max-h-[90vh]">
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+                    <div className="bg-white dark:bg-[#0f172a] w-full max-w-4xl rounded-3xl border border-slate-700 shadow-2xl flex flex-col max-h-[90vh] my-auto">
                         {/* Header */}
                         <div className="p-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-gray-50 dark:bg-[#1e293b] rounded-t-3xl">
                             <div>
@@ -846,8 +846,8 @@ const Team: React.FC = () => {
 
             {/* DELETE CONFIRMATION MODAL */}
             {deleteModal.open && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-[#1e293b] w-full max-w-sm rounded-2xl p-6 shadow-2xl border border-gray-200 dark:border-slate-700 text-center animate-in zoom-in-95">
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+                    <div className="bg-white dark:bg-[#1e293b] w-full max-w-sm rounded-2xl p-5 sm:p-6 shadow-2xl border border-gray-200 dark:border-slate-700 text-center animate-in zoom-in-95 my-auto max-h-[90vh] overflow-y-auto">
                         <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
                             <AlertCircle className="w-8 h-8 text-red-600" />
                         </div>
