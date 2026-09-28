@@ -66,12 +66,23 @@ app.use(express.json());
 // Serve static files from the React app
 const distPath = path.join(__dirname, '../dist');
 
-// Serve all static files normally
-app.use(express.static(distPath));
+// Serve all static files with proper cache headers
+app.use(express.static(distPath, {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+        } else if (filePath.includes('/assets/')) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+    }
+}));
 
 // Protect /assets from falling through to the React catch-all
 // If an asset is missing (e.g. old cached version requested), return 404 instead of index.html
 app.use('/assets', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.status(404).send('Asset not found');
 });
 
@@ -1176,6 +1187,9 @@ app.get('*', (req, res, next) => {
         return res.status(404).send('Not Found');
     }
 
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.sendFile(path.join(distPath, 'index.html'));
 });
 
