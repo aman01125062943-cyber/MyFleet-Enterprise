@@ -11,6 +11,20 @@ import {
     Download, Search, AlertTriangle, Gauge, CheckCircle, Filter, Calendar, ChevronDown
 } from 'lucide-react';
 
+const getArabicDayName = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        const date = new Date(year, month, day);
+        const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+        return days[date.getDay()];
+    }
+    return '';
+};
+
 const Inventory: React.FC = () => {
     const location = useLocation();
     const { user, org, isReadOnly, refreshProfile } = useOutletContext<LayoutContextType>();
@@ -915,77 +929,85 @@ const Inventory: React.FC = () => {
             )}
 
             {/* 2. ADD / EDIT TRANSACTION MODAL (Updated Z-Index) */}
+            {/* 2. ADD / EDIT TRANSACTION MODAL (Updated Z-Index & Compact Mobile View) */}
             {showAddTx && (
                 <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto"
                     onClick={(e) => {
                         if (e.target === e.currentTarget) setShowAddTx(false);
                     }}
                 >
-                    <div className="bg-white dark:bg-[#1e293b] w-full max-w-sm rounded-2xl p-5 sm:p-6 shadow-2xl border border-gray-200 dark:border-slate-700 animate-in zoom-in-95 relative max-h-[90vh] overflow-y-auto my-auto">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                                {newTx.type === 'income' ? <TrendingUp className="text-emerald-500" /> : <TrendingDown className="text-red-500" />}
+                    <div className="bg-white dark:bg-[#1e293b] w-full max-w-sm rounded-2xl p-4 sm:p-5 shadow-2xl border border-gray-200 dark:border-slate-700 animate-in zoom-in-95 relative max-h-[92vh] overflow-y-auto my-auto">
+                        <div className="flex justify-between items-center mb-2.5">
+                            <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
+                                {newTx.type === 'income' ? <TrendingUp className="w-5 h-5 text-emerald-500" /> : <TrendingDown className="w-5 h-5 text-red-500" />}
                                 {editingTxId ? 'تعديل السجل' : (newTx.type === 'income' ? 'تسجيل إيراد' : 'تسجيل مصروف')}
                             </h3>
                             <button
                                 onClick={() => setShowAddTx(false)}
-                                className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                                className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                             >
-                                <X className="w-5 h-5 text-slate-400 hover:text-red-500" />
+                                <X className="w-4 h-4 text-slate-400 hover:text-red-500" />
                             </button>
                         </div>
 
-                        <form onSubmit={handleSaveTx} className="space-y-4">
-                            <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700 text-center">
-                                <span className="text-xs text-slate-500 block mb-1">السيارة المحددة</span>
-                                <span className="font-bold text-slate-800 dark:text-white">
+                        <form onSubmit={handleSaveTx} className="space-y-2.5">
+                            <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded-xl border border-slate-100 dark:border-slate-700 text-center">
+                                <span className="text-[11px] text-slate-500 inline-block ml-1">السيارة:</span>
+                                <span className="font-bold text-xs sm:text-sm text-slate-800 dark:text-white">
                                     {cars.find(c => c.id === newTx.car_id)?.make} {cars.find(c => c.id === newTx.car_id)?.model}
                                 </span>
                             </div>
 
                             {/* Quick Templates Section */}
                             {templates.filter(t => t.is_active && (t.type === newTx.type || (!t.type && newTx.type === 'expense'))).length > 0 && (
-                                <div className="mb-4">
-                                    <label className="text-xs font-bold text-slate-500 mb-2 block flex items-center gap-1">
+                                <div className="mb-2">
+                                    <label className="text-[11px] font-bold text-slate-500 mb-1 block flex items-center gap-1">
                                         <span className={`w-1.5 h-1.5 rounded-full ${newTx.type === 'income' ? 'bg-emerald-500' : 'bg-red-500'} inline-block`}></span>
                                         {newTx.type === 'income' ? 'إيرادات جاهزة (اختر للتعبئة)' : 'مصروفات جاهزة (اختر للتعبئة)'}
                                     </label>
-                                    <div className="flex flex-wrap gap-2">
+                                    <div className="flex flex-wrap gap-1.5">
                                         {templates.filter(t => t.is_active && (t.type === newTx.type || (!t.type && newTx.type === 'expense'))).map(t => (
                                             <button
                                                 key={t.id}
                                                 type="button"
                                                 onClick={() => applyTemplate(t)}
-                                                className="px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 hover:shadow-sm transition active:scale-95"
+                                                className="px-2.5 py-1 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-[11px] font-bold border border-slate-200 dark:border-slate-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition active:scale-95"
                                             >
-                                                {t.title} <span className="opacity-60 text-[10px] pr-1">({t.amount})</span>
+                                                {t.title} <span className="opacity-60 text-[10px] pr-0.5">({t.amount})</span>
                                             </button>
                                         ))}
                                     </div>
                                 </div>
                             )}
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 gap-2.5">
                                 <div>
-                                    <label className="text-xs font-bold text-slate-500 mb-1 block">المبلغ</label>
-                                    <input type="number" required min="0" step="0.01" className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white font-bold focus:border-blue-500" placeholder="0.00" value={newTx.amount} onChange={e => setNewTx({ ...newTx, amount: e.target.value })} />
+                                    <label className="text-[11px] font-bold text-slate-500 mb-0.5 block">المبلغ</label>
+                                    <input type="number" required min="0" step="0.01" className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-2.5 outline-none text-slate-800 dark:text-white font-bold text-sm focus:border-blue-500" placeholder="0.00" value={newTx.amount} onChange={e => setNewTx({ ...newTx, amount: e.target.value })} />
                                 </div>
                                 <div>
-                                    <label className="text-xs font-bold text-slate-500 mb-1 block">التاريخ</label>
-                                    <input type="date" required className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white focus:border-blue-500" value={newTx.date} onChange={e => setNewTx({ ...newTx, date: e.target.value })} />
+                                    <div className="flex justify-between items-center mb-0.5">
+                                        <label className="text-[11px] font-bold text-slate-500 block">التاريخ</label>
+                                        {getArabicDayName(newTx.date) && (
+                                            <span className="text-blue-600 dark:text-blue-400 font-extrabold bg-blue-50 dark:bg-blue-900/40 px-1.5 py-0.5 rounded text-[10px]">
+                                                {getArabicDayName(newTx.date)}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <input type="date" required className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-2.5 outline-none text-slate-800 dark:text-white font-bold text-xs sm:text-sm focus:border-blue-500" value={newTx.date} onChange={e => setNewTx({ ...newTx, date: e.target.value })} />
                                 </div>
                             </div>
 
                             <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <label className="text-xs font-bold text-slate-500 block">التصنيف</label>
+                                <div className="flex justify-between items-center mb-0.5">
+                                    <label className="text-[11px] font-bold text-slate-500 block">التصنيف</label>
                                     <button
                                         type="button"
                                         onClick={() => {
                                             setShowCatManager({ show: true, type: newTx.type });
                                         }}
-                                        className="text-[10px] font-bold text-blue-500 flex items-center gap-1 hover:underline"
+                                        className="text-[10px] font-bold text-blue-500 flex items-center gap-0.5 hover:underline"
                                     >
                                         <Edit className="w-2.5 h-2.5" /> تعديل القائمة
                                     </button>
@@ -994,7 +1016,7 @@ const Inventory: React.FC = () => {
                                     <div className="flex items-center">
                                         <input
                                             type="text"
-                                            className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-r-xl p-3 outline-none text-slate-800 dark:text-white focus:border-blue-500 font-bold"
+                                            className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-r-xl p-2.5 outline-none text-slate-800 dark:text-white focus:border-blue-500 font-bold text-sm"
                                             placeholder="اختر أو اكتب..."
                                             value={newTx.category}
                                             onChange={e => setNewTx({ ...newTx, category: e.target.value })}
@@ -1003,14 +1025,14 @@ const Inventory: React.FC = () => {
                                         <button
                                             type="button"
                                             onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                                            className="px-3 py-3.5 bg-slate-100 dark:bg-slate-800 border-y border-l border-gray-200 dark:border-slate-700 rounded-l-xl text-slate-500 hover:text-blue-500 transition"
+                                            className="px-2.5 py-3 bg-slate-100 dark:bg-slate-800 border-y border-l border-gray-200 dark:border-slate-700 rounded-l-xl text-slate-500 hover:text-blue-500 transition"
                                         >
-                                            <ChevronDown className={`w-5 h-5 transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
+                                            <ChevronDown className={`w-4 h-4 transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
                                         </button>
                                     </div>
 
                                     {showCategoryDropdown && (
-                                        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#1e293b] border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto">
+                                        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#1e293b] border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl z-50 max-h-40 overflow-y-auto">
                                             {(activeCategories as any)[newTx.type].length > 0 ? (
                                                 (activeCategories as any)[newTx.type].map((cat: any) => (
                                                     <button
@@ -1020,13 +1042,13 @@ const Inventory: React.FC = () => {
                                                             setNewTx({ ...newTx, category: cat.label });
                                                             setShowCategoryDropdown(false);
                                                         }}
-                                                        className="w-full text-right px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 border-b border-gray-50 dark:border-slate-700/50 last:border-0 transition"
+                                                        className="w-full text-right px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 border-b border-gray-50 dark:border-slate-700/50 last:border-0 transition"
                                                     >
                                                         {cat.label}
                                                     </button>
                                                 ))
                                             ) : (
-                                                <div className="p-4 text-center text-xs text-slate-400">لا توجد تصنيفات، اكتب يدوياً</div>
+                                                <div className="p-3 text-center text-xs text-slate-400">لا توجد تصنيفات، اكتب يدوياً</div>
                                             )}
                                         </div>
                                     )}
@@ -1034,11 +1056,11 @@ const Inventory: React.FC = () => {
                             </div>
 
                             <div>
-                                <label className="text-xs font-bold text-slate-500 mb-1 block">ملاحظات</label>
-                                <textarea className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-3 outline-none text-slate-800 dark:text-white h-20 focus:border-blue-500" placeholder="تفاصيل إضافية..." value={newTx.notes} onChange={e => setNewTx({ ...newTx, notes: e.target.value })}></textarea>
+                                <label className="text-[11px] font-bold text-slate-500 mb-0.5 block">ملاحظات</label>
+                                <textarea className="w-full bg-slate-50 dark:bg-[#0f172a] border border-gray-200 dark:border-slate-700 rounded-xl p-2.5 outline-none text-slate-800 dark:text-white text-xs h-14 focus:border-blue-500" placeholder="تفاصيل إضافية..." value={newTx.notes} onChange={e => setNewTx({ ...newTx, notes: e.target.value })}></textarea>
                             </div>
 
-                            <button disabled={saveLoading} className={`w-full py-3 rounded-xl font-bold text-white shadow-lg flex items-center justify-center gap-2 ${newTx.type === 'income' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500'}`}>
+                            <button disabled={saveLoading} className={`w-full py-2.5 rounded-xl font-bold text-sm text-white shadow-lg flex items-center justify-center gap-2 ${newTx.type === 'income' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500'}`}>
                                 {saveLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                                 {editingTxId ? 'حفظ التعديلات' : (newTx.type === 'income' ? 'حفظ الإيراد' : 'حفظ المصروف')}
                             </button>

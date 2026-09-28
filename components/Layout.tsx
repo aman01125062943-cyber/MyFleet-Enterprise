@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabaseClient';
 import {
   Car, Home, Users, Settings, LogOut,
   ShieldCheck, Calculator, Crown, Sun, Moon, AlertTriangle, Lock, ArrowRight,
-  Wifi, WifiOff, Database, ChevronLeft, Menu, DollarSign, Wrench, Download, Wallet
+  Wifi, WifiOff, Database, ChevronLeft, Menu, DollarSign, Wrench, Download, Wallet, MessageCircle
 } from 'lucide-react';
 import { seedLocalDB, syncData } from '../lib/syncManager';
 import { Profile, Organization, UserPermissions, SystemConfig } from '../types';
@@ -313,7 +313,18 @@ const Layout: React.FC = () => {
           })}
         </nav>
 
-        <div className="p-4 border-t border-gray-100 dark:border-slate-800">
+        <div className="p-4 border-t border-gray-100 dark:border-slate-800 space-y-3">
+          {/* WhatsApp Support Link in Sidebar */}
+          <a
+            href={`https://wa.me/${systemConfig?.whatsapp_number || '201066284516'}?text=${encodeURIComponent("السلام عليكم، لدي استفسار بخصوص خدماتكم.")}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 font-bold text-xs sm:text-sm transition border border-emerald-200/60 dark:border-emerald-800/40"
+          >
+            <MessageCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span>الدعم الفني عبر واتساب</span>
+          </a>
+
           {/* User Profile Mini Card */}
           <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-gray-100 dark:border-slate-700">
             <div className="flex items-center gap-3 mb-3">
@@ -449,12 +460,23 @@ const Layout: React.FC = () => {
                   key={item.id}
                   to={item.path}
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 font-bold"
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 font-bold text-sm"
                 >
-                  <item.icon className="w-5 h-5" />
+                  <item.icon className="w-5 h-5 text-slate-500" />
                   {item.label}
                 </Link>
               ))}
+
+              <a
+                href={`https://wa.me/${systemConfig?.whatsapp_number || '201066284516'}?text=${encodeURIComponent("السلام عليكم، لدي استفسار بخصوص خدماتكم.")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-bold text-sm border border-emerald-200/60 dark:border-emerald-800/40 mt-4"
+              >
+                <MessageCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <span>الدعم الفني عبر واتساب</span>
+              </a>
             </nav>
           </div>
         </div>
